@@ -1,0 +1,32 @@
+-- <PROJECT_DIR>/simulator/lv_conf.h
+-- Using configuration: <PROJECT_DIR>/simulator/lv_conf.h
+-- Configuring done (0.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: <PROJECT_DIR>/build/host
+[  5%] Built target lua_host
+[  8%] Built target platform_host
+[  8%] Built target media_response_tests
+[  8%] Built target core_tests
+[  8%] Built target organizer_tests
+[  9%] Built target media_installer_tests
+[ 99%] Built target lvgl
+[ 99%] Building CXX object CMakeFiles/tab5sim.dir<PROJECT_DIR>/components/platform/ui.cpp.o
+[100%] Linking CXX executable tab5sim
+[100%] Built target tab5sim
+Installation verified: 129 files, 4617598 / 4000000000 bytes
+Test project <PROJECT_DIR>/build/host
+    Start 1: core
+1/5 Test #1: core .............................   Passed    0.45 sec
+    Start 2: organizer
+2/5 Test #2: organizer ........................   Passed    1.04 sec
+    Start 3: package_fixtures
+3/5 Test #3: package_fixtures .................   Passed    0.03 sec
+    Start 4: media_installer
+4/5 Test #4: media_installer ..................   Passed    0.64 sec
+    Start 5: media_response
+5/5 Test #5: media_response ...................   Passed    4.12 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =   6.28 sec
+UI smoke passed: mock camera image, Brazilian masks, dropdowns, file manager copy/sidebar, 20 clock/converter/switcher/back cycles, calculator keypad, dark landscape, UTF-8, clipboard, deferred background input, alarm, touch keypad, SD save

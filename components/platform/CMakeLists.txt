@@ -1,0 +1,2 @@
+idf_component_register(SRCS "storage.cpp" "hash.cpp" "files.cpp" "api.cpp" "timers.cpp" "runtime.cpp" "input.cpp" "ui.cpp" "lv_memory.cpp" "streams.cpp" "installer.cpp" "media.cpp" "video.cpp" "network.cpp" "codec_mp3.cpp" "codec_images.cpp" "codec_jpeg_write.cpp" "extensions.cpp" INCLUDE_DIRS "include" REQUIRES lua lvgl__lvgl mbedtls fatfs pthread heap)
+target_compile_features(${COMPONENT_LIB} PUBLIC cxx_std_17)

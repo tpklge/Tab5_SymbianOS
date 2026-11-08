@@ -1,0 +1,11 @@
+build/
+managed_components/
+sdkconfig
+sdkconfig.old
+.DS_Store
+references/
+dist/
+__pycache__/
+.venv-dev/
+
+.tools/

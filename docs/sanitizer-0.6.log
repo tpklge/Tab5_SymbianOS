@@ -1,0 +1,15 @@
+Test project <PROJECT_DIR>/build/asan
+    Start 1: core
+1/5 Test #1: core .............................   Passed    1.07 sec
+    Start 2: organizer
+2/5 Test #2: organizer ........................   Passed    1.83 sec
+    Start 3: package_fixtures
+3/5 Test #3: package_fixtures .................   Passed    0.03 sec
+    Start 4: media_installer
+4/5 Test #4: media_installer ..................   Passed    1.23 sec
+    Start 5: media_response
+5/5 Test #5: media_response ...................   Passed    5.00 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =   9.16 sec

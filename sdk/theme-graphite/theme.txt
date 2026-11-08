@@ -1,0 +1,4 @@
+background=202329
+accent=45596b
+foreground=f1f5fa
+fieldColor=2d343e

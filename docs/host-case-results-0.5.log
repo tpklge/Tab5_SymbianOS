@@ -1,0 +1,68 @@
+Start testing: Nov 08 03:03 -04
+----------------------------------------------------------
+1/4 Testing: core
+1/4 Test: core
+Command: "<PROJECT_DIR>/build/host/core_tests" "<PROJECT_DIR>/simulator/../sdcard/SymbianOS"
+Directory: <PROJECT_DIR>/build/host
+"core" start time: Nov 08 03:03 -04
+Output:
+----------------------------------------------------------
+62 checks passed
+<end of output>
+Test time =   0.66 sec
+----------------------------------------------------------
+Test Passed.
+"core" end time: Nov 08 03:03 -04
+"core" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/4 Testing: organizer
+2/4 Test: organizer
+Command: "<PROJECT_DIR>/build/host/organizer_tests" "<PROJECT_DIR>/simulator/../sdcard/SymbianOS"
+Directory: <PROJECT_DIR>/build/host
+"organizer" start time: Nov 08 03:03 -04
+Output:
+----------------------------------------------------------
+175 phase 2/3 checks passed
+<end of output>
+Test time =   1.13 sec
+----------------------------------------------------------
+Test Passed.
+"organizer" end time: Nov 08 03:03 -04
+"organizer" time elapsed: 00:00:01
+----------------------------------------------------------
+
+3/4 Testing: package_fixtures
+3/4 Test: package_fixtures
+Command: "/opt/homebrew/Frameworks/Python.framework/Versions/3.14/bin/python3.14" "<PROJECT_DIR>/simulator/../tests/make_package_fixtures.py" "<PROJECT_DIR>/simulator/../build/package-fixtures"
+Directory: <PROJECT_DIR>/build/host
+"package_fixtures" start time: Nov 08 03:03 -04
+Output:
+----------------------------------------------------------
+<PROJECT_DIR>/simulator/../build/package-fixtures/hello.t5pkg
+<PROJECT_DIR>/simulator/../build/package-fixtures/theme.t5pkg
+<end of output>
+Test time =   0.03 sec
+----------------------------------------------------------
+Test Passed.
+"package_fixtures" end time: Nov 08 03:03 -04
+"package_fixtures" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/4 Testing: media_installer
+4/4 Test: media_installer
+Command: "<PROJECT_DIR>/build/host/media_installer_tests" "<PROJECT_DIR>/simulator/../sdcard/SymbianOS" "<PROJECT_DIR>/simulator/../build/package-fixtures" "<PROJECT_DIR>/simulator/../tests/fixtures"
+Directory: <PROJECT_DIR>/build/host
+"media_installer" start time: Nov 08 03:03 -04
+Output:
+----------------------------------------------------------
+140 media/installer checks passed
+<end of output>
+Test time =   1.14 sec
+----------------------------------------------------------
+Test Passed.
+"media_installer" end time: Nov 08 03:03 -04
+"media_installer" time elapsed: 00:00:01
+----------------------------------------------------------
+
+End testing: Nov 08 03:03 -04

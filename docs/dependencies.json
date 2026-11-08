@@ -1,0 +1,64 @@
+[
+  {
+    "name": "ESP-IDF",
+    "url": "https://github.com/espressif/esp-idf",
+    "commit": "296b6eab9445fd720e71aecab961e2d3fbca9944",
+    "path": "<ESP_IDF_PATH>"
+  },
+  {
+    "name": "Tab5 UserDemo",
+    "url": "https://github.com/m5stack/M5Tab5-UserDemo",
+    "commit": "fe8aa051beb9385468f7e46b909e764169df3f7a",
+    "path": "references/M5Tab5-UserDemo"
+  },
+  {
+    "name": "Tab5 Keyboard UserDemo",
+    "url": "https://github.com/m5stack/M5Tab5-Keyboard-UserDemo",
+    "commit": "b4c36227e2f3373e4e1f8cd7063aefa05cbf72bf",
+    "path": "references/M5Tab5-Keyboard-UserDemo"
+  },
+  {
+    "name": "Lua",
+    "version": "5.4.9",
+    "url": "https://www.lua.org/ftp/lua-5.4.9.tar.gz",
+    "sha256": "2335b6c582a52654f94612bf10d2f4672805d05329aa6568b1d8cd9e5c6fb8e6",
+    "license": "MIT"
+  },
+  {
+    "name": "Noto Sans Regular",
+    "url": "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
+    "sha256": "b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5",
+    "license": "SIL OFL 1.1",
+    "location": "sdcard/SymbianOS/system/releases/0.1.0/FONT-LICENSE.txt"
+  },
+  {
+    "name": "clang-format",
+    "version": "20.1.8",
+    "scope": "optional developer formatter (.venv-dev); not part of runtime"
+  },
+  {
+    "name": "StyLua",
+    "version": "2.6.0",
+    "scope": "optional Lua formatter, not embedded",
+    "url": "https://github.com/JohnnyMorganz/StyLua/releases/download/v2.6.0/stylua-macos-aarch64.zip",
+    "sha256": "dab9b66d340ca5ffc8225211f1dcf89b84783e09b8cbec8c518497eba81f3c42"
+  },
+  {
+    "name": "esp_hosted",
+    "version": "1.4.0",
+    "url": "https://components.espressif.com/components/espressif/esp_hosted/versions/1.4.0",
+    "path": "managed_components/espressif__esp_hosted",
+    "license": "Apache-2.0",
+    "integrity": "dependencies.lock",
+    "integration": "CMake build-local overlay for Hosted error propagation/cancellation; no C6 firmware flashed"
+  },
+  {
+    "name": "esp_wifi_remote",
+    "version": "0.8.5",
+    "url": "https://components.espressif.com/components/espressif/esp_wifi_remote/versions/0.8.5",
+    "path": "managed_components/espressif__esp_wifi_remote",
+    "license": "Apache-2.0",
+    "integrity": "dependencies.lock",
+    "integration": "CMake build-local overlay for Hosted error propagation/cancellation; no C6 firmware flashed"
+  }
+]

@@ -1,0 +1,175 @@
+[
+  {
+    "component": "espressif__bmi270",
+    "license_files": [
+      "managed_components/espressif__bmi270/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__cmake_utilities",
+    "license_files": [
+      "managed_components/espressif__cmake_utilities/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_cam_sensor",
+    "license_files": [
+      "managed_components/espressif__esp_cam_sensor/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__esp_codec_dev",
+    "license_files": [
+      "managed_components/espressif__esp_codec_dev/LICENSE",
+      "managed_components/espressif__esp_codec_dev/device/zl38063/LICENSE.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_h264",
+    "license_files": [
+      "managed_components/espressif__esp_h264/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__esp_io_expander",
+    "license_files": [
+      "managed_components/espressif__esp_io_expander/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_io_expander_pi4ioe5v6408",
+    "license_files": [
+      "managed_components/espressif__esp_io_expander_pi4ioe5v6408/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_ipa",
+    "license_files": [
+      "managed_components/espressif__esp_ipa/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__esp_lcd_ili9881c",
+    "license_files": [
+      "managed_components/espressif__esp_lcd_ili9881c/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_lcd_st7123",
+    "license_files": [
+      "managed_components/espressif__esp_lcd_st7123/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_lcd_touch",
+    "license_files": [
+      "managed_components/espressif__esp_lcd_touch/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_lcd_touch_gt911",
+    "license_files": [
+      "managed_components/espressif__esp_lcd_touch_gt911/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_lcd_touch_st7123",
+    "license_files": [
+      "managed_components/espressif__esp_lcd_touch_st7123/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_lvgl_port",
+    "license_files": [
+      "managed_components/espressif__esp_lvgl_port/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__esp_sccb_intf",
+    "license_files": [
+      "managed_components/espressif__esp_sccb_intf/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__esp_video",
+    "license_files": [
+      "managed_components/espressif__esp_video/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__i2c_bus",
+    "license_files": [
+      "managed_components/espressif__i2c_bus/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__m5stack_tab5",
+    "license_files": [
+      "managed_components/espressif__m5stack_tab5/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__sensor_hub",
+    "license_files": [
+      "managed_components/espressif__sensor_hub/license.txt"
+    ]
+  },
+  {
+    "component": "espressif__usb",
+    "license_files": [
+      "managed_components/espressif__usb/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__usb_host_uvc",
+    "license_files": [
+      "managed_components/espressif__usb_host_uvc/LICENSE"
+    ]
+  },
+  {
+    "component": "lvgl__lvgl",
+    "license_files": [
+      "managed_components/lvgl__lvgl/src/libs/thorvg/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/tjpgd/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/frogfs/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/tiny_ttf/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/vg_lite_driver/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/FT800-FT813/LICENSE",
+      "managed_components/lvgl__lvgl/src/libs/lz4/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/qrcode/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/lodepng/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/barcode/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/nanovg/LICENSE.txt",
+      "managed_components/lvgl__lvgl/src/libs/gif/LICENSE",
+      "managed_components/lvgl__lvgl/scripts/built_in_font/font_license/DejaVuSans/LICENSE",
+      "managed_components/lvgl__lvgl/scripts/built_in_font/font_license/FontAwesome5/LICENSE.txt",
+      "managed_components/lvgl__lvgl/scripts/built_in_font/font_license/FontAwesome/LICENSE.txt",
+      "managed_components/lvgl__lvgl/scripts/built_in_font/font_license/SourceHanSansSC/LICENSE.txt",
+      "managed_components/lvgl__lvgl/tests/src/test_libs/rnd_unicodes/rnd_unicodes/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__esp_serial_slave_link",
+    "license_files": [
+      "managed_components/espressif__esp_serial_slave_link/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__eppp_link",
+    "license_files": [
+      "managed_components/espressif__eppp_link/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__esp_wifi_remote",
+    "license_files": [
+      "managed_components/espressif__esp_wifi_remote/LICENSE"
+    ]
+  },
+  {
+    "component": "espressif__esp_hosted",
+    "license_files": [
+      "managed_components/espressif__esp_hosted/LICENSE"
+    ]
+  }
+]

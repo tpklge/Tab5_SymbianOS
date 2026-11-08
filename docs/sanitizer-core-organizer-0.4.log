@@ -1,0 +1,9 @@
+Test project <PROJECT_DIR>/build/asan
+    Start 1: core
+1/2 Test #1: core .............................   Passed    0.62 sec
+    Start 2: organizer
+2/2 Test #2: organizer ........................   Passed    1.28 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   1.89 sec

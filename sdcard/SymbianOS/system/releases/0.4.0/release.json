@@ -1,0 +1,31 @@
+{
+  "version": "0.4.0",
+  "apps": {
+    "shell": "shell.lua",
+    "notes": "notes.lua",
+    "calculator": "calculator.lua",
+    "contacts": "contacts.lua",
+    "agenda": "agenda.lua",
+    "clock": "clock.lua",
+    "converter": "converter.lua",
+    "files": "files.lua",
+    "backup": "backup.lua",
+    "profiles": "profiles.lua",
+    "services": "services.lua"
+  },
+  "grants": {
+    "contacts": "/data/organizer/,/home/Documents/",
+    "agenda": "/data/organizer/,/home/Documents/",
+    "clock": "/data/organizer/,/config/public/",
+    "services": "/data/organizer/,/config/public/",
+    "profiles": "/config/public/",
+    "files": "/",
+    "backup": "/backups/"
+  },
+  "capabilities": {
+    "services": "notify,clock,profile",
+    "clock": "clock",
+    "backup": "backup",
+    "profiles": "profile"
+  }
+}

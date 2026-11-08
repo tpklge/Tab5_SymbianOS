@@ -1,0 +1,22 @@
+-- <PROJECT_DIR>/simulator/lv_conf.h
+-- Using configuration: <PROJECT_DIR>/simulator/lv_conf.h
+-- Configuring done (0.1s)
+-- Generating done (0.1s)
+-- Build files have been written to: <PROJECT_DIR>/build/host
+[  6%] Built target lua_host
+[  7%] Built target platform_host
+[  8%] Built target core_tests
+[  8%] Built target organizer_tests
+[ 99%] Built target lvgl
+[100%] Built target tab5sim
+Installation verified: 75 files, 2101346 / 4000000000 bytes
+Test project <PROJECT_DIR>/build/host
+    Start 1: core
+1/2 Test #1: core .............................   Passed    0.11 sec
+    Start 2: organizer
+2/2 Test #2: organizer ........................   Passed    0.61 sec
+
+100% tests passed out of 2
+
+Total Test time (real) =   0.73 sec
+UI smoke passed: 20 clock/converter/switcher/back cycles, calculator keypad, dark landscape, UTF-8, clipboard, deferred background input, alarm, touch keypad, SD save
