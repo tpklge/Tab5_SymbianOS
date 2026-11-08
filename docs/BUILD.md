@@ -11,7 +11,7 @@ Mantém a correção do upload 0.7.3 e testes de streaming acima de 1 MiB, limit
 | `SymbianOS-runtime.bin` | 2010576 |
 | `SymbianOS-update-0.8.0.zip` | 389739 |
 | `SymbianOS-sdcard.zip` | 2777103 |
-| `SymbianOS-SDK-0.8.0.zip` | 26671 |
+| `SymbianOS-SDK-0.8.0.zip` | 26738 |
 
 SD modelo: 9575433 bytes lógicos incluindo versões anteriores. A release exige BIN e SD 0.8.0 juntos. As credenciais novas só são criadas no SD do usuário; a ferramenta de release recusa a pasta privada com arquivos pessoais.
 
