@@ -26,6 +26,7 @@ Runtime::VM::~VM() {
 }
 Runtime::~Runtime() { shutdown(); }
 void Runtime::shutdown() {
+  network_.cancel();
   media_.stop();
   media_.stopVideo();
   media_.camera(false);
@@ -748,11 +749,11 @@ bool Runtime::boot() {
       (values["api_min"] != "1" && values["api_min"] != "2" &&
        values["api_min"] != "3" && values["api_min"] != "4" &&
        values["api_min"] != "5" && values["api_min"] != "6" &&
-       values["api_min"] != "7") ||
+       values["api_min"] != "7" && values["api_min"] != "8") ||
       (values["api_max"] != "1" && values["api_max"] != "2" &&
        values["api_max"] != "3" && values["api_max"] != "4" &&
        values["api_max"] != "5" && values["api_max"] != "6" &&
-       values["api_max"] != "7") ||
+       values["api_max"] != "7" && values["api_max"] != "8") ||
       values["api_min"] > values["api_max"] || values["schema"] != "1") {
     error = "incompatible release";
     return false;
@@ -830,9 +831,9 @@ bool Runtime::boot() {
           return false;
         }
       }
-  for (auto *dir : {"/meta", "/backups", "/config/public", "/apps",
-                    "/home/Music", "/home/Recordings", "/home/Pictures",
-                    "/home/Transfer", "/update/packages"})
+  for (auto *dir : {"/meta", "/backups", "/config/public", "/config/network",
+                    "/apps", "/home/Music", "/home/Recordings",
+                    "/home/Pictures", "/home/Transfer", "/update/packages"})
     if (!store_.prepare(dir)) {
       error = store_.lastError();
       return false;

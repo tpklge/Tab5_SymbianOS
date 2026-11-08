@@ -1,5 +1,7 @@
 # Versão 0.7.0 / API 6 — energia, áudio e fase 6
 
+Documento histórico. A [0.8.0](REDES_SALVAS_0_8.md) acrescenta credenciais no SD, conexão automática e token de oito caracteres.
+
 ## Bateria e carregamento
 
 A barra superior mostra um ícone de bateria e porcentagem perto do relógio. `+` indica corrente de carga detectada; `--%` indica leitura indisponível. A leitura do INA226 (I²C 0x41, shunt de 5 mΩ) ocorre fora da tarefa gráfica, a cada dois segundos. O percentual é estimado pela tensão de um pack 2S, não é um contador de carga calibrado; carga e consumo alteram a estimativa.

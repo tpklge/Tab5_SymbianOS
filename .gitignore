@@ -9,3 +9,7 @@ __pycache__/
 .venv-dev/
 
 .tools/
+
+# Saved Wi-Fi credentials belong to the user SD, never to the source tree.
+sdcard/SymbianOS/config/network/*
+!sdcard/SymbianOS/config/network/.gitkeep

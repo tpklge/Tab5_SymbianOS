@@ -1,18 +1,20 @@
-# Validação — residente 0.7.2 / SD 0.7.1 / API 7
+# Validação — 0.8.0 / API 8
 
-Build ESP32-P4 com ESP-IDF 5.4.4 concluído. Aplicação: **2002640 bytes**, dentro do slot de 2 MiB. O linker confirma controlador ISP, configuração SC202CS de AGC/exposição e AWB presentes no BIN. DIRAM estática atribuída: 118636 bytes; não mede pico de heap/pilhas. O crescimento do código nesta revisão corresponde à ativação do controlador automático/algoritmos de imagem e parâmetros do sensor.
+Build ESP32-P4 com ESP-IDF 5.4.4 concluído. Aplicação: **2010576 bytes**, dentro do slot de 2 MiB. DIRAM estática atribuída: 118636 bytes; não mede picos físicos.
 
-Sete suites CTest passaram no host e ASan/UBSan, com jornada gráfica normal LVGL/SDL. Novos casos verificam prévia acima do antigo teto de 5 fps em backend simulado, prévia mais rápida que a gravação durante filmagem e número de quadros do AVI compatível com a cadência de gravação de até 5 fps. O controlador automático real não é exercitado no host.
+Oito suites CTest passaram no host, com jornada gráfica LVGL/SDL. ASan/UBSan passou nas suites sem SDL. A nova suite verifica redes salvas entre instâncias, senha correta reutilizada nativamente, conectar sem salvar, falha de autenticação sem persistência, reconexão/backoff após perda, desconexão manual, preferências automáticas, esquecer, arquivo inválido preservado, interface sem senha e token de oito caracteres. Backend de rádio é simulado.
+
+Mantém a correção do upload 0.7.3 e testes de streaming acima de 1 MiB, limite do buffer, quota, concorrência, interrupção e diagnóstico. O usuário confirmou arquivo enviado com sucesso após a correção, sem fornecer medições de pilha ou uma bancada exaustiva.
 
 | Artefato em dist/ | Bytes |
 |---|---:|
-| `SymbianOS-runtime.bin` | 2002640 |
-| `SymbianOS-update-0.7.1.zip` | 389048 |
-| `SymbianOS-sdcard.zip` | 2393455 |
-| `SymbianOS-SDK-0.7.1.zip` | 22543 |
+| `SymbianOS-runtime.bin` | 2010576 |
+| `SymbianOS-update-0.8.0.zip` | 389739 |
+| `SymbianOS-sdcard.zip` | 2777103 |
+| `SymbianOS-SDK-0.8.0.zip` | 26671 |
 
-Hashes da distribuição e identidade com o BIN compilado conferidos. O conteúdo do SD 0.7.1 não mudou nesta correção: se já está instalado, basta atualizar o BIN. O pacote de SD continua preservando os documentos existentes.
+SD modelo: 9575433 bytes lógicos incluindo versões anteriores. A release exige BIN e SD 0.8.0 juntos. As credenciais novas só são criadas no SD do usuário; a ferramenta de release recusa a pasta privada com arquivos pessoais.
 
-Relatórios: [resumo](size-summary-0.7.2.json), [componentes](size-components-0.7.2.json), [arquivos](size-files-0.7.2.json). Logs: [host](host-validation-0.7.2.log), [sanitizadores](sanitizer-0.7.2.log), [ESP32-P4](esp32p4-build-0.7.2.log). [Mudanças e limites](HOTFIX_0_7_2.md), [versão anterior](BUILD_0_7_1.md).
+Relatórios: [resumo](size-summary-0.8.json), [componentes](size-components-0.8.json), [arquivos](size-files-0.8.json). Logs: [host](host-validation-0.8.log), [sanitizadores](sanitizer-0.8.log), [ESP32-P4](esp32p4-build-0.8.log). [Uso e armazenamento das redes](REDES_SALVAS_0_8.md), [validação anterior](BUILD_0_7_3.md).
 
-Alvo de prévia de até 20 fps, luminosidade, convergência de exposição, cor, recursos simultâneos e reabertura precisam de validação física. O usuário confirmou imagem escura/lenta na versão anterior, além de áudio e carga QC funcionando. Nenhum flash, monitor ou serial foi executado.
+Reconexão, token curto e preferências desta versão precisam de aceitação física. Relatos anteriores confirmaram câmera, música, gravador, QC e transferência de arquivo, mas não substituem testes instrumentados de consumo, fps ou recuperação de falhas. Nenhum flash, monitor ou serial executado.

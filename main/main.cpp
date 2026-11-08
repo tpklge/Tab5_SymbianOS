@@ -75,7 +75,7 @@ extern "C" void app_main() {
     auto stage = [&](const char *name) {
       storage.write(
           "/logs/startup.txt",
-          std::string("runtime=0.7.2\nstage=") + name + "\nreset_reason=" +
+          std::string("runtime=0.8.0\nstage=") + name + "\nreset_reason=" +
               std::to_string(esp_reset_reason()) + "\nmain_stack_free_bytes=" +
               std::to_string(uxTaskGetStackHighWaterMark(nullptr)) +
               "\ninternal_free_bytes=" +
@@ -93,19 +93,19 @@ extern "C" void app_main() {
     stage("runtime-boot");
     if (runtime.boot()) {
       tab5_load_transfer_page(runtime);
-      storage.write("/logs/boot.txt", "runtime=0.7.2\nreset_reason=" +
+      storage.write("/logs/boot.txt", "runtime=0.8.0\nreset_reason=" +
                                           std::to_string(esp_reset_reason()) +
                                           "\n");
     }
   } else
     runtime.error = "microSD ausente ou ilegível";
   if (mounted)
-    storage.write("/logs/startup-stage.txt", "runtime=0.7.2\nstage=ui-start\n");
+    storage.write("/logs/startup-stage.txt", "runtime=0.8.0\nstage=ui-start\n");
   bsp_display_lock(0);
   ui.start();
   bsp_display_unlock();
   if (mounted)
-    storage.write("/logs/startup-stage.txt", "runtime=0.7.2\nstage=running\n");
+    storage.write("/logs/startup-stage.txt", "runtime=0.8.0\nstage=running\n");
   tab5_poll_power(runtime);
   if (mounted)
     tab5_restore_charge(runtime);

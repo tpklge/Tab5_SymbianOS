@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
             !runtime.faulted() && runtime.view().body == "Divisão por zero",
         "division by zero controlled failure");
   check(runtime.open("shell"), "calculator error does not stop shell");
-  auto chromePath = root / "system/releases/0.7.1/chrome.lua";
+  auto chromePath = root / "system/releases/0.8.0/chrome.lua";
   auto chrome = get(chromePath);
   auto updatedChrome = chrome;
   auto color = updatedChrome.find("26292e");
@@ -113,19 +113,19 @@ int main(int argc, char **argv) {
         "external theme changes without firmware rebuild");
   put(chromePath, chrome);
   put(root / "boot/manifest.txt", oldManifest);
-  std::string original = get(root / "system/releases/0.7.1/notes.lua");
-  put(root / "system/releases/0.7.1/notes.lua", original + "\n-- modified");
+  std::string original = get(root / "system/releases/0.8.0/notes.lua");
+  put(root / "system/releases/0.8.0/notes.lua", original + "\n-- modified");
   check(!runtime.boot(), "hash mismatch prevents boot");
-  put(root / "system/releases/0.7.1/notes.lua", original);
+  put(root / "system/releases/0.8.0/notes.lua", original);
   auto manifest = get(root / "boot/manifest.txt");
   auto incompatible = manifest;
-  auto apiAt = incompatible.find("api_min=7");
-  incompatible.replace(apiAt, 9, "api_min=8");
+  auto apiAt = incompatible.find("api_min=8");
+  incompatible.replace(apiAt, 9, "api_min=9");
   put(root / "boot/manifest.txt", incompatible);
   check(!runtime.boot(), "incompatible API rejected");
   put(root / "boot/manifest.txt", manifest);
   auto addApp = [&](const std::string &script) {
-    put(root / "system/releases/0.7.1/test.lua", script);
+    put(root / "system/releases/0.8.0/test.lua", script);
     put(root / "boot/manifest.txt",
         manifest + "app.test=test.lua\nfile=test.lua|" + sha256(script) + "\n");
   };
@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
   check(!linkedRoot.mount(), "root symlink with trailing separator rejected");
   Keyboard kb;
   check(kb.configure(
-            get(fs::path(argv[1]) / "system/releases/0.7.1/keyboard.map")),
+            get(fs::path(argv[1]) / "system/releases/0.8.0/keyboard.map")),
         "external keymap");
   check(kb.matrix(2, 1, true, 0)[0].text == "q", "matrix decoding");
   check(kb.matrix(2, 1, true, 1).empty(), "ignore duplicate press");

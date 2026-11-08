@@ -206,6 +206,8 @@ int Runtime::offlineApi(lua_State *L) {
     return luaL_error(L, "profile capability denied");
   bool offline = lua_toboolean(L, 1);
   bool ok = !r->offlineWriter_ || r->offlineWriter_(offline);
+  if (ok && !offline)
+    r->network_.resumeAutomatic();
   lua_pushboolean(L, ok);
   return 1;
 }

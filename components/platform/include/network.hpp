@@ -2,6 +2,7 @@
 #pragma once
 #include "executor.hpp"
 #include "storage.hpp"
+#include <array>
 #include <atomic>
 #include <memory>
 namespace tab5 {
@@ -13,10 +14,14 @@ public:
     std::string ssid, security;
     int signal = 0, channel = 0;
   };
+  struct SavedNetwork {
+    std::string ssid;
+    bool automatic = true;
+  };
   struct Status {
     bool busy = false, connected = false, sharing = false;
     uint64_t bytes = 0;
-    std::string message = "Offline", address, token;
+    std::string message = "Offline", address, token, ssid;
     std::vector<AccessPoint> networks;
   };
   using Sink = std::function<bool(const char *, size_t)>;
@@ -42,6 +47,17 @@ private:
   std::mutex transferMutex_;
   Status status_;
   std::atomic<bool> cancel_{false}, completed_{false};
+  struct Profile {
+    std::string ssid, password;
+    bool automatic = true;
+  };
+  mutable std::mutex profilesMutex_;
+  bool loadProfiles(std::vector<Profile> &);
+  bool storeProfiles(const std::vector<Profile> &);
+  bool remember(const std::string &, const std::string &);
+  bool autoSuppressed_ = false;
+  std::atomic<bool> automaticJob_{false};
+  uint64_t nextAutoMs_ = 0;
   bool start(std::function<void()>);
   void finish(bool, const std::string &);
 
@@ -49,7 +65,17 @@ public:
   explicit Network(Storage &s) : disk_(s) {}
   ~Network();
   Status status() const;
-  bool connect(const std::string &, const std::string &);
+  bool connect(const std::string &, const std::string &, bool remember = false);
+  std::vector<SavedNetwork> saved();
+  bool connectSaved(const std::string &);
+  bool forget(const std::string &);
+  bool setAutomatic(const std::string &, bool);
+  bool autoConnect(uint64_t nowMs);
+  void resumeAutomatic() {
+    autoSuppressed_ = false;
+    nextAutoMs_ = 0;
+  }
+  static std::string transferToken(const std::array<uint8_t, 8> &);
   bool share(bool);
   bool scan();
   bool download(const std::string &, const std::string &, bool feed = false);
@@ -58,7 +84,8 @@ public:
   static bool validUrl(const std::string &);
   static bool sharedPath(const std::string &);
   bool receive(const std::string &, const std::function<int(char *, size_t)> &,
-               size_t);
+               size_t,
+               const std::function<void(const char *, size_t)> &progress = {});
   bool send(const std::string &, const Sink &);
 };
 } // namespace tab5

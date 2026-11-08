@@ -2,6 +2,7 @@
 #include "bsp/m5stack_tab5.h"
 #include "esp_crt_bundle.h"
 #include "esp_event.h"
+#include "esp_heap_caps.h"
 #include "esp_hosted_api.h"
 #include "esp_http_client.h"
 #include "esp_http_server.h"
@@ -27,7 +28,7 @@ void failure(const std::string &message) {
   if (systemRuntime)
     systemRuntime->storage().write(
         "/logs/network.txt",
-        "runtime=0.7.2\nhosted=1.4.0\nwifi_remote=0.8.5\n" + message + "\n");
+        "runtime=0.8.0\nhosted=1.4.0\nwifi_remote=0.8.5\n" + message + "\n");
 }
 bool checked(esp_err_t result, const char *stage) {
   if (result == ESP_OK)
@@ -129,9 +130,34 @@ esp_err_t transfer(httpd_req_t *req) {
     return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Nome inválido");
   auto &net = systemRuntime->network();
   if (req->method == HTTP_PUT) {
+    int socketResult = 0;
     bool ok = net.receive(
-        path, [req](char *p, size_t n) { return httpd_req_recv(req, p, n); },
-        req->content_len);
+        path,
+        [req, &socketResult](char *p, size_t n) {
+          // A short socket timeout is recoverable; a closed socket/cancel is
+          // not.
+          for (unsigned attempt = 0; attempt < 5; ++attempt) {
+            int result = httpd_req_recv(req, p, n);
+            socketResult = result;
+            if (result != HTTPD_SOCK_ERR_TIMEOUT)
+              return result;
+          }
+          return HTTPD_SOCK_ERR_TIMEOUT;
+        },
+        req->content_len,
+        [req, &socketResult](const char *stage, size_t bytes) {
+          systemRuntime->storage().write(
+              "/logs/last-upload.txt",
+              std::string("runtime=0.8.0\nstage=") + stage +
+                  "\nreceived=" + std::to_string(bytes) +
+                  "\nexpected=" + std::to_string(req->content_len) +
+                  "\nlast_socket_result=" + std::to_string(socketResult) +
+                  "\nhttp_stack_free_bytes=" +
+                  std::to_string(uxTaskGetStackHighWaterMark(nullptr)) +
+                  "\ninternal_free_bytes=" +
+                  std::to_string(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)) +
+                  "\n");
+        });
     if (!ok)
       return httpd_resp_send_err(
           req, HTTPD_400_BAD_REQUEST,
@@ -172,16 +198,11 @@ bool share(bool on, std::string &ip, std::string &key) {
   if (!linked)
     return false;
   if (!server) {
-    uint8_t bytes[16];
-    esp_fill_random(bytes, sizeof(bytes));
-    token.clear();
-    const char *hex = "0123456789abcdef";
-    for (auto b : bytes) {
-      token += hex[b >> 4];
-      token += hex[b & 15];
-    }
+    std::array<uint8_t, 8> random{};
+    esp_fill_random(random.data(), random.size());
+    token = tab5::Network::transferToken(random);
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
-    cfg.stack_size = 8192;
+    cfg.stack_size = 32768;
     cfg.max_open_sockets = 2;
     cfg.recv_wait_timeout = 2;
     cfg.send_wait_timeout = 2;
@@ -310,7 +331,7 @@ void tab5_setup_network(tab5::Runtime &runtime) {
     if (esp_hosted_get_coprocessor_fwversion(&firmware) == ESP_OK)
       systemRuntime->storage().write(
           "/logs/network.txt",
-          "runtime=0.7.2\nhosted=1.4.0\nwifi_remote=0.8.5\nC6=" +
+          "runtime=0.8.0\nhosted=1.4.0\nwifi_remote=0.8.5\nC6=" +
               std::to_string(firmware.major1) + "." +
               std::to_string(firmware.minor1) + "." +
               std::to_string(firmware.patch1) + "\n");

@@ -60,5 +60,5 @@ for name,(a,b,shape) in shapes.items():
  for r,g,b,a in im.get_flattened_data():
   rgb+=struct.pack('<H',((r>>3)<<11)|((g>>2)<<5)|(b>>3));alpha.append(a)
  out+=name.encode().ljust(16,b'\0')+rgb+alpha
-(ROOT/'sdcard/SymbianOS/system/releases/0.7.1/icons.bin').write_bytes(out)
+(ROOT/'sdcard/SymbianOS/system/releases/0.8.0/icons.bin').write_bytes(out)
 print(f'{len(shapes)} original icons, {len(out)} SD bytes')

@@ -385,7 +385,7 @@ int main(int argc, char **argv) {
       "sys.send('mailbox','late','')elseif e=='late'then n=n+1 elseif "
       "e=='explode'then while true do end end;return "
       "{title='Mailbox',body=tostring(n),buttons={}}end";
-  put(root / "system/releases/0.7.1/mailbox.lua", mailbox);
+  put(root / "system/releases/0.8.0/mailbox.lua", mailbox);
   put(root / "boot/manifest.txt",
       manifest + "app.mailbox=mailbox.lua\nfile=mailbox.lua|" +
           sha256(mailbox) + "\n");

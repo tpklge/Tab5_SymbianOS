@@ -361,6 +361,7 @@ int Runtime::networkApi(lua_State *L) {
     str(L, "message", s.message);
     str(L, "address", s.address);
     str(L, "token", s.token);
+    str(L, "ssid", s.ssid);
     lua_pushboolean(L, s.busy);
     lua_setfield(L, -2, "busy");
     lua_pushboolean(L, s.connected);
@@ -384,6 +385,18 @@ int Runtime::networkApi(lua_State *L) {
     lua_setfield(L, -2, "bytes");
     return 1;
   }
+  if (op == "saved") {
+    auto profiles = r->network_.saved();
+    lua_newtable(L);
+    for (size_t i = 0; i < profiles.size(); ++i) {
+      lua_newtable(L);
+      str(L, "ssid", profiles[i].ssid);
+      lua_pushboolean(L, profiles[i].automatic);
+      lua_setfield(L, -2, "automatic");
+      lua_rawseti(L, -2, i + 1);
+    }
+    return 1;
+  }
   size_t n = 0, m = 0;
   const char *a = luaL_optlstring(L, 2, "", &n),
              *b = luaL_optlstring(L, 3, "", &m);
@@ -397,12 +410,24 @@ int Runtime::networkApi(lua_State *L) {
   } else if (op == "disconnect") {
     r->network_.disconnect();
     ok = true;
-  } else if (!(r->store_.read("/config/public/profile", profile) &&
-               profile == "offline")) {
-    if (op == "scan")
+  } else if (op == "forget")
+    ok = r->network_.forget(std::string(a, n));
+  else if (op == "automatic")
+    ok = r->network_.setAutomatic(std::string(a, n), std::string(b, m) == "on");
+  else if (!(r->store_.read("/config/public/profile", profile) &&
+             profile == "offline")) {
+    if (op == "autoconnect")
+      ok = r->network_.autoConnect(
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now().time_since_epoch())
+              .count());
+    else if (op == "connect_saved")
+      ok = r->network_.connectSaved(std::string(a, n));
+    else if (op == "scan")
       ok = r->network_.scan();
     else if (op == "connect")
-      ok = r->network_.connect(std::string(a, n), std::string(b, m));
+      ok = r->network_.connect(std::string(a, n), std::string(b, m),
+                               lua_toboolean(L, 4));
     else if (op == "share")
       ok = r->network_.share(std::string(a, n) == "on");
     else if (op == "download" || op == "feed")

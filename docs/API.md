@@ -1,6 +1,6 @@
-# API 7 — runtime 0.7.1
+# API 8 — runtime 0.8.0
 
-O runtime também aceita manifestos de API 1/2/3/4/5/6 para releases anteriores. A release 0.7.1 declara `api_min=7` e `api_max=7`, impedindo a carga parcial no residente antigo. Esquema global de instalação permanece 1; registros e sessões usam cabeçalho `T5DATA1` e são introduzidos sem converter destrutivamente o documento TXT de Notas.
+O runtime também aceita manifestos de API 1/2/3/4/5/6/7 para releases anteriores. A release 0.8.0 declara `api_min=8` e `api_max=8`, impedindo a carga parcial no residente antigo. Esquema global de instalação permanece 1; registros e sessões usam cabeçalho `T5DATA1` e são introduzidos sem converter destrutivamente o documento TXT de Notas.
 
 ## Ciclo de vida e vistas
 
@@ -102,3 +102,9 @@ Controles de formulário aceitam tipo `password`, com máscara gráfica. Não co
 ## API 7 — busca de redes
 
 `sys.net("scan")` agenda busca assíncrona, com capacidade network e perfil fora de Offline. `sys.net("status").networks` retorna até 32 entradas `{ssid, security, signal, channel}`, sem SSIDs vazios ou com NUL/quebra de linha, ordenadas pelo sinal e deduplicadas pelo SSID. O cache só é substituído ao concluir uma busca válida. `cancel` interrompe a busca; status mantém o motivo detalhado fornecido pelo backend. Não persiste credenciais.
+
+## API 8 — redes conhecidas
+
+`sys.net("connect",ssid,password,remember)` recebe booleano opcional para persistir após sucesso. `saved` retorna lista `{ssid, automatic}`, sem senha; `connect_saved(ssid)` reutiliza a credencial nativa; `forget(ssid)` remove; `automatic(ssid,"on"|"off")` altera a preferência. `status` inclui `ssid` conectado. `autoconnect` agenda a tentativa com backoff e é chamado pelo serviço do SD em tick; todas as operações exigem network. Perfil Offline é respeitado e a desconexão manual suspende tentativas na sessão. Credenciais em config/network são nativas e não exigem concessão de leitura/escrita bruta ao app.
+
+O token de transferência passa a 8 caracteres. Upload continua com buffer limitado no heap, pilha HTTP de 32 KiB e logs/last-upload.txt. [Formato de dados e limites](REDES_SALVAS_0_8.md).

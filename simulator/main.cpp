@@ -149,6 +149,20 @@ int main(int argc, char **argv) {
         return true;
       };
     }
+    if (preview && std::string(argv[3]) == "network:saved") {
+      runtime.network().backend.connect =
+          [](const std::string &, const std::string &, std::string &ip,
+             const std::atomic<bool> &) {
+            ip = "192.0.2.5";
+            return true;
+          };
+      for (auto name : {"Casa exemplo", "Estúdio exemplo"}) {
+        runtime.network().connect(name, "apenas-preview", true);
+        while (runtime.network().status().busy)
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      runtime.network().setAutomatic("Estúdio exemplo", false);
+    }
     if (preview && std::string(argv[3]) == "network:scan") {
       runtime.network().backend.scan =
           [](std::vector<Network::AccessPoint> &found,

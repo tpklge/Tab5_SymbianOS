@@ -1,0 +1,19 @@
+Test project <PROJECT_DIR>/build/asan
+    Start 1: core
+1/7 Test #1: core .............................   Passed    1.18 sec
+    Start 2: organizer
+2/7 Test #2: organizer ........................   Passed    2.98 sec
+    Start 3: package_fixtures
+3/7 Test #3: package_fixtures .................   Passed    0.07 sec
+    Start 4: media_installer
+4/7 Test #4: media_installer ..................   Passed    1.79 sec
+    Start 5: media_response
+5/7 Test #5: media_response ...................   Passed    6.22 sec
+    Start 6: network_power
+6/7 Test #6: network_power ....................   Passed    1.11 sec
+    Start 7: camera_format
+7/7 Test #7: camera_format ....................   Passed    0.05 sec
+
+100% tests passed out of 7
+
+Total Test time (real) =  13.41 sec

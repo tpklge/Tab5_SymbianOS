@@ -2,6 +2,7 @@
 #include "network.hpp"
 #include <algorithm>
 #include <cctype>
+#include <new>
 namespace tab5 {
 Network::~Network() {
   cancel_ = true;
@@ -51,22 +52,37 @@ void Network::finish(bool ok, const std::string &message) {
   status_.message = cancel_ ? "Cancelado" : message;
   (void)ok;
 }
-bool Network::connect(const std::string &ssid, const std::string &pass) {
+bool Network::connect(const std::string &ssid, const std::string &pass,
+                      bool save) {
   if (ssid.empty() || ssid.size() > 32 || pass.size() > 63 ||
       ssid.find('\0') != std::string::npos ||
+      ssid.find_first_of("\r\n") != std::string::npos ||
       pass.find('\0') != std::string::npos)
     return false;
-  return start([this, ssid, pass] {
+  if (automaticJob_) {
+    cancel_ = true;
+    if (worker_)
+      worker_->join();
+    completed_ = false;
+    automaticJob_ = false;
+  }
+  autoSuppressed_ = false;
+  return start([this, ssid, pass, save] {
     std::string address;
-    bool ok = backend.connect && backend.connect(ssid, pass, address, cancel_);
+    bool ok = backend.connect &&
+              backend.connect(ssid, pass, address, cancel_) && !cancel_;
+    bool persisted = !save || !ok || remember(ssid, pass);
     {
       std::lock_guard<std::mutex> lock(mutex_);
       status_.connected = ok;
       status_.address = ok ? address : "";
+      status_.ssid = ok ? ssid : "";
     }
-    finish(ok, ok                   ? "Conectado"
-               : backend.diagnostic ? backend.diagnostic()
-                                    : "Falha de conexão Wi-Fi");
+    finish(ok,
+           ok                   ? (persisted ? "Conectado"
+                                             : "Conectado; não foi possível salvar a rede no SD")
+           : backend.diagnostic ? backend.diagnostic()
+                                : "Falha de conexão Wi-Fi");
   });
 }
 bool Network::scan() {
@@ -117,6 +133,7 @@ bool Network::share(bool on) {
   });
 }
 void Network::disconnect() {
+  autoSuppressed_ = true;
   cancel_ = true;
   if (worker_) {
     worker_->join();
@@ -210,38 +227,74 @@ bool Network::download(const std::string &url, const std::string &path,
                                : error));
   });
 }
-bool Network::receive(const std::string &path,
-                      const std::function<int(char *, size_t)> &read,
-                      size_t length) {
+bool Network::receive(
+    const std::string &path, const std::function<int(char *, size_t)> &read,
+    size_t length, const std::function<void(const char *, size_t)> &progress) {
   std::unique_lock<std::mutex> transfer(transferMutex_, std::try_to_lock);
-  if (!transfer.owns_lock() || !sharedPath(path) || !length ||
-      length > 64 * 1024 * 1024 || !disk_.canFit(length))
+  auto report = [&](const char *stage, size_t n) {
+    if (progress)
+      progress(stage, n);
+  };
+  if (!transfer.owns_lock())
     return false;
+  report("checking", 0);
+  if (!sharedPath(path) || !length || length > 64 * 1024 * 1024 ||
+      !disk_.canFit(length)) {
+    report("rejected", 0);
+    return false;
+  }
   std::vector<File> files;
-  if (!disk_.listDir("/home/Transfer", files))
+  if (!disk_.listDir("/home/Transfer", files)) {
+    report("directory-failed", 0);
     return false;
+  }
   for (auto &f : files)
-    if (f.path == path)
+    if (f.path == path) {
+      report("destination-exists", 0);
       return false;
-  auto partial = path + ".part";
-  if (!disk_.write(partial, ""))
+    }
+  // HTTP handlers must leave stack space for the network and FAT call chains.
+  constexpr size_t blockSize = 4096;
+  std::unique_ptr<char[]> buffer(new (std::nothrow) char[blockSize]);
+  if (!buffer) {
+    report("buffer-unavailable", 0);
     return false;
-  char buffer[4096];
-  size_t received = 0;
+  }
+  auto partial = path + ".part";
+  if (!disk_.write(partial, "")) {
+    report("create-failed", 0);
+    return false;
+  }
+  size_t received = 0, reported = 0;
   bool ok = true;
+  const char *failure = "receive-failed";
+  report("receiving", 0);
   while (received < length) {
-    int n = read(buffer, std::min(sizeof(buffer), length - received));
-    if (n <= 0 || size_t(n) > length - received ||
-        !disk_.append(partial, std::string(buffer, n))) {
+    size_t requested = std::min(blockSize, length - received);
+    int n = read(buffer.get(), requested);
+    if (n <= 0 || size_t(n) > requested) {
+      ok = false;
+      break;
+    }
+    if (!disk_.append(partial, std::string(buffer.get(), n))) {
+      failure = "write-failed";
       ok = false;
       break;
     }
     received += n;
+    if (received - reported >= 1024 * 1024) {
+      report("receiving", received);
+      reported = received;
+    }
   }
-  if (ok)
+  if (ok) {
+    report("committing", received);
     ok = disk_.move(partial, path);
+    failure = "commit-failed";
+  }
   if (!ok)
     disk_.remove(partial);
+  report(ok ? "complete" : failure, received);
   return ok;
 }
 bool Network::send(const std::string &path, const Sink &sink) {

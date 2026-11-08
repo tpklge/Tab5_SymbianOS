@@ -181,6 +181,38 @@ int main(int argc, char **argv) {
                    }) &&
               data == upload,
           "streamed download roundtrip");
+    std::vector<std::pair<std::string, size_t>> uploadStages;
+    size_t generated = 0;
+    check(net.receive(
+              "/home/Transfer/large-upload.bin",
+              [&](char *out, size_t n) {
+                check(n <= 4096, "upload read size stays bounded");
+                memset(out, 'u', n);
+                generated += n;
+                return int(n);
+              },
+              1024 * 1024 + 17,
+              [&](const char *stage, size_t bytes) {
+                uploadStages.emplace_back(stage, bytes);
+              }),
+          "upload larger than one MiB streams successfully");
+    check(generated == 1024 * 1024 + 17 &&
+              uploadStages.front().first == "checking" &&
+              uploadStages.back().first == "complete" &&
+              uploadStages.back().second == generated,
+          "upload diagnostics cover preflight through exact completion");
+    bool progress = false;
+    for (auto &stage : uploadStages)
+      if (stage.first == "receiving" && stage.second >= 1024 * 1024)
+        progress = true;
+    check(progress,
+          "upload publishes progress without retaining whole payload");
+    check(!net.receive(
+              "/home/Transfer/bad-reader.bin",
+              [](char *, size_t n) { return int(n + 1); }, 8192),
+          "reader cannot exceed supplied buffer");
+    check(!fs::exists(root / "home/Transfer/bad-reader.bin.part"),
+          "invalid reader leaves no published file or partial");
     check(!net.receive(
               "/home/Transfer/partial.bin", [](char *, size_t) { return 0; },
               100),

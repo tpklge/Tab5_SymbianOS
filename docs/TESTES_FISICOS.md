@@ -47,3 +47,7 @@ Registrar resultados reais e falhas. Só então avaliar a passagem dos critério
 - Abrir Câmera em ambiente iluminado e observar a convergência de exposição/ganho. Alternar a direção para área mais clara e mais escura, conferindo luminosidade e cores. Registrar tempo de resposta e qualquer erro do ISP/sensor.
 - Medir fps/latência reais da prévia, com áudio e sem áudio. Alvo de software até 20 fps não comprova esse desempenho na unidade.
 - Fotografar e gravar vídeo com a prévia ativa; conferir exposição dos arquivos, cadência do AVI até 5 fps e responsividade de Voltar/Início. Sair/reabrir a câmera repetidamente e verificar memória/retomada do ISP.
+
+## Aceitação 0.8.0
+
+O usuário confirmou envio de arquivo bem-sucedido após a correção do upload. Ainda testar: conectar e salvar, reiniciar com AP presente/ausente, reconectar após queda, desligar conexão automática por rede, perfil Offline, desconexão manual, conectar sem salvar e esquecer. Conferir que nenhuma senha aparece na interface/diagnóstico e que a preferência persiste no SD. Testar token de oito caracteres, renovação ao reabrir o serviço e invalidação ao encerrar.

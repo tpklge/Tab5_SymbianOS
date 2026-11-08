@@ -11,13 +11,16 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 SD = ROOT / 'sdcard' / 'SymbianOS'
 DIST = ROOT / 'dist'
-VERSION = '0.7.1'
-RUNTIME_VERSION = '0.7.2'
+VERSION = '0.8.0'
+RUNTIME_VERSION = '0.8.0'
 
 def digest(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 def main():
+    private=SD/'config/network'
+    if private.exists() and any(p.is_file() and p.name!='.gitkeep' for p in private.rglob('*')):
+        raise SystemExit('Release requires the template SD: remove personal saved Wi-Fi credentials from the distribution source.')
     subprocess.run([sys.executable, str(ROOT/'tools/package_sd.py'), '--verify'], check=True)
     desc=json.loads((ROOT/'build/project_description.json').read_text())
     if desc['project_version']!=RUNTIME_VERSION:
@@ -63,7 +66,7 @@ def main():
     with zipfile.ZipFile(sdk_zip,'w',zipfile.ZIP_DEFLATED)as z:
         for p in sorted((ROOT/'sdk').rglob('*')):
             if p.is_file():z.write(p,p.relative_to(ROOT).as_posix())
-        for name in ['tools/make_package.py','docs/SDK.md','docs/API.md','docs/FASES_4_5.md','docs/FASE_6_0_7.md','docs/CORRECOES_0_7_1.md','docs/HOTFIX_0_7_2.md','LICENSE']:
+        for name in ['tools/make_package.py','docs/SDK.md','docs/API.md','docs/FASES_4_5.md','docs/FASE_6_0_7.md','docs/CORRECOES_0_7_1.md','docs/HOTFIX_0_7_2.md','docs/HOTFIX_0_7_3.md','docs/REDES_SALVAS_0_8.md','LICENSE']:
             z.write(ROOT/name,name)
     notices=DIST/'licenses';notices.mkdir(exist_ok=True)
     for name in ['minimp3-LICENSE','stb-LICENSE','sources.json']:
@@ -76,7 +79,7 @@ def main():
     shutil.copy2(ROOT/'managed_components/espressif__esp_hosted/common/protobuf-c/LICENSE',notices/'protobuf-c-LICENSE')
     artifacts=[sdk_zip]+sorted(packages.glob('*.t5pkg'))+[DIST/'SymbianOS-runtime.bin',DIST/'SymbianOS-sdcard.zip',update]+sorted(install.glob('*.bin'))
     (DIST/'SHA256SUMS').write_text(''.join(digest(p)+'  '+str(p.relative_to(DIST))+'\n'for p in artifacts))
-    (DIST/'release.json').write_text(json.dumps({'version':VERSION,'runtime_version':RUNTIME_VERSION,'api':7,'application_bytes':app.stat().st_size,'application_sha256':digest(app),'sd_logical_bytes':sum(p.stat().st_size for p in SD.rglob('*')if p.is_file()),'update_zip':update.name,'required_update':['application bin','boot/manifest.txt','system/releases/0.7.1','missing data/config directories'],'preserved':['existing user documents','existing configuration','previous SD releases']},indent=2)+'\n')
+    (DIST/'release.json').write_text(json.dumps({'version':VERSION,'runtime_version':RUNTIME_VERSION,'api':8,'application_bytes':app.stat().st_size,'application_sha256':digest(app),'sd_logical_bytes':sum(p.stat().st_size for p in SD.rglob('*')if p.is_file()),'update_zip':update.name,'required_update':['application bin','boot/manifest.txt','system/releases/0.8.0','missing data/config directories'],'preserved':['existing user documents','existing configuration','previous SD releases']},indent=2)+'\n')
     print(f'Prepared application ({app.stat().st_size} bytes), full SD and data-preserving update package.')
 
 if __name__=='__main__':main()

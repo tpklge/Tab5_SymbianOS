@@ -7,7 +7,7 @@ import zipfile
 import json
 
 LIMIT = 4_000_000_000
-RELEASE = '0.7.1'
+RELEASE = '0.8.0'
 def files(root):
     result=[]
     aliases=set()
@@ -33,7 +33,7 @@ def main():
     manifest=root/'boot/manifest.txt';release=root/'system/releases'/RELEASE
     catalog=json.loads((release/'release.json').read_text())
     if not args.verify:
-        entries=['format=1','api_min=7','api_max=7','schema=1',f'release={RELEASE}']
+        entries=['format=1','api_min=8','api_max=8','schema=1',f'release={RELEASE}']
         entries += [f'app.{key}={value}' for key,value in catalog['apps'].items()]
         entries += [f'grant.{key}={value}' for key,value in catalog['grants'].items()]
         entries += [f'cap.{key}={value}' for key,value in catalog['capabilities'].items()]
@@ -48,7 +48,7 @@ def main():
         if key!='file':
             if key in values:raise ValueError(f'duplicate manifest key: {key}')
             values[key]=value
-    for key,value in {'format':'1','api_min':'7','api_max':'7','schema':'1','release':RELEASE,'app.shell':'shell.lua','app.notes':'notes.lua','app.calculator':'calculator.lua'}.items():
+    for key,value in {'format':'1','api_min':'8','api_max':'8','schema':'1','release':RELEASE,'app.shell':'shell.lua','app.notes':'notes.lua','app.calculator':'calculator.lua'}.items():
         if values.get(key)!=value:raise ValueError(f'invalid manifest field: {key}')
     for line in lines:
         if line.startswith('file='):
