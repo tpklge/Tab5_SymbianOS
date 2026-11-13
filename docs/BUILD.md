@@ -1,20 +1,11 @@
-# Validação — 0.8.0 / API 8
+# Validação — 0.18.1 / API 14
 
-Build ESP32-P4 com ESP-IDF 5.4.4 concluído. Aplicação: **2010576 bytes**, dentro do slot de 2 MiB. DIRAM estática atribuída: 118636 bytes; não mede picos físicos.
+Build ESP32-P4: 2089536 bytes, 7616 bytes livres no slot de 2 MiB. Streaming SDIO ativo e partições preservadas.
 
-Oito suites CTest passaram no host, com jornada gráfica LVGL/SDL. ASan/UBSan passou nas suites sem SDL. A nova suite verifica redes salvas entre instâncias, senha correta reutilizada nativamente, conectar sem salvar, falha de autenticação sem persistência, reconexão/backoff após perda, desconexão manual, preferências automáticas, esquecer, arquivo inválido preservado, interface sem senha e token de oito caracteres. Backend de rádio é simulado.
+24 suítes host e jornada LVGL passaram; dez suítes relacionadas passaram com ASan/UBSan. A regressão de textarea mede o número de eventos ao carregar texto longo UTF-8 e confere limites e filtros. A jornada verifica quatro atualizações dos valores de heap sem trocar a árvore LVGL e posição do botão OTA fora dos cartões. O e-mail inclui uma mensagem longa com 2.200 caracteres multibyte para abrir/responder. SMTP verifica 535 antes de MAIL FROM/DATA, ausência de segredos e senha de envio vazia. Backup/restauração da árvore atual passou após ampliar o limite a 4.096 entradas.
 
-Mantém a correção do upload 0.7.3 e testes de streaming acima de 1 MiB, limite do buffer, quota, concorrência, interrupção e diagnóstico. O usuário confirmou arquivo enviado com sucesso após a correção, sem fornecer medições de pilha ou uma bancada exaustiva.
+Captura física na versão instalada 0.18.0: quatro watchdogs de taskLVGL/IDLE0; [serial](serial-watchdog-0.18.0.log) e [endereços decodificados](serial-watchdog-decoded-0.18.0.log). O monitor foi autorizado explicitamente e encerrado. Sua abertura provocou CHIP_USB_UART_RESET apesar de DTR/RTS desativados e isso foi informado ao usuário. Nenhum flash, OTA, erase, envio real de e-mail ou publicação foi executado. Validação física da correção 0.18.1 ainda pendente.
 
-| Artefato em dist/ | Bytes |
-|---|---:|
-| `SymbianOS-runtime.bin` | 2010576 |
-| `SymbianOS-update-0.8.0.zip` | 389739 |
-| `SymbianOS-sdcard.zip` | 2777103 |
-| `SymbianOS-SDK-0.8.0.zip` | 26738 |
+[Correções](INTERFACE_SMTP_0_18_1.md), [medição RISC-V do núcleo HTML/CSS](TAMANHO_HTML_CSS_0_18_1.md). Evidências: [host/LVGL](validation-host-0.18.1.log), [ASan/UBSan](validation-sanitizer-0.18.1.log), [build ESP32-P4](validation-build-0.18.1.log).
 
-SD modelo: 9575433 bytes lógicos incluindo versões anteriores. A release exige BIN e SD 0.8.0 juntos. As credenciais novas só são criadas no SD do usuário; a ferramenta de release recusa a pasta privada com arquivos pessoais.
-
-Relatórios: [resumo](size-summary-0.8.json), [componentes](size-components-0.8.json), [arquivos](size-files-0.8.json). Logs: [host](host-validation-0.8.log), [sanitizadores](sanitizer-0.8.log), [ESP32-P4](esp32p4-build-0.8.log). [Uso e armazenamento das redes](REDES_SALVAS_0_8.md), [validação anterior](BUILD_0_7_3.md).
-
-Reconexão, token curto e preferências desta versão precisam de aceitação física. Relatos anteriores confirmaram câmera, música, gravador, QC e transferência de arquivo, mas não substituem testes instrumentados de consumo, fps ou recuperação de falhas. Nenhum flash, monitor ou serial executado.
+Pacotes conferidos: BIN idêntico ao compilado, slot respeitado, manifesto 0.18.1/API14, hashes e ZIPs íntegros, pares OTA correspondentes, sem dados pessoais nos pacotes e streaming SDIO ativo. Dist conserva 0.18.1, 0.18.0 e 0.17.1. Prévia de Testes e medições inspecionada no simulador.

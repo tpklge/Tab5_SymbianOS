@@ -381,9 +381,13 @@ void tab5_signal(bool alarm) {
   int16_t tone[4800];
   for (unsigned block = 0; block < (alarm ? 12u : 4u); ++block) {
     for (unsigned i = 0; i < 4800; ++i) {
-      unsigned phase = (i + block * 4800) % 48;
+      unsigned choice=alarm && mediaControl?mediaControl->alertTone():0;
+      unsigned period=choice==1?72:choice==2?(block%2?40:60):48;
+      unsigned phase = (i + block * 4800) % period;
       int envelope = (i < 160 ? i : 4800 - i < 160 ? 4800 - i : 160);
-      tone[i] = (phase < 24 ? 9000 : -9000) * envelope / 160;
+      int sample=choice==1?(int(phase<period/2?phase:period-phase)*12000/int(period/2)-6000):(phase<period/2?9000:-9000);
+      if(choice==2 && block%4==3)sample=0;
+      tone[i] = sample * envelope / 160;
     }
     if (!output(tone, 4800, 48000, 1,
                 mediaControl ? mediaControl->volume() : 60))

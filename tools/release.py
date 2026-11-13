@@ -1,85 +1,89 @@
 #!/usr/bin/env python3
 """Prepare reviewed local release artifacts. Never connects to a device."""
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import shutil
 import subprocess
 import sys
-import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SD = ROOT / 'sdcard' / 'SymbianOS'
-DIST = ROOT / 'dist'
-VERSION = '0.8.0'
-RUNTIME_VERSION = '0.8.0'
+DIST = ROOT / 'sist' / '1.0.0'
+VERSION = '1.0.0'
+RUNTIME_VERSION = '1.0.0'
+
+def validate_template(sd):
+    # Runtime data can occur anywhere outside the versioned system resources.
+    # Never depend on a growing blacklist of applications with private files.
+    for path in sd.rglob('*'):
+        if path.is_symlink():
+            raise ValueError(f'Link forbidden in distribution: {path}')
+        if not path.is_file() or path.name == '.DS_Store' or path.name.startswith('._'):
+            continue
+        rel = path.relative_to(sd)
+        if rel == Path('boot/manifest.txt') or rel.parts[:2] == ('system', 'releases'):
+            continue
+        if path.name == '.gitkeep' and path.stat().st_size == 0:
+            continue
+        raise ValueError(f'Private or unexpected file in template SD: {rel}')
 
 def digest(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
 
 def main():
-    private=SD/'config/network'
-    if private.exists() and any(p.is_file() and p.name!='.gitkeep' for p in private.rglob('*')):
-        raise SystemExit('Release requires the template SD: remove personal saved Wi-Fi credentials from the distribution source.')
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--launcher-only', action='store_true', help='Generate only the application BIN and SymbianOS folder for Launcher WebGUI')
+    args = parser.parse_args()
+    args.launcher_only = True  # Runtime updates belong exclusively to Launcher.
+    validate_template(SD)
     subprocess.run([sys.executable, str(ROOT/'tools/package_sd.py'), '--verify'], check=True)
     desc=json.loads((ROOT/'build/project_description.json').read_text())
     if desc['project_version']!=RUNTIME_VERSION:
         raise SystemExit('Build version mismatch; run ./tools/idf.sh build first.')
+    config=json.loads((ROOT/'build/config/sdkconfig.json').read_text())
+    if config.get('ESP_HOSTED_SDIO_OPTIMIZATION_RX_STREAMING_MODE') is not True:
+        raise SystemExit('Refusing packet-RX image: factory C6 requires streaming RX.')
+    if config.get('BT_NIMBLE_NVS_PERSIST') or config.get('NIMBLE_NVS_PERSIST'):
+        raise SystemExit('Refusing BLE credential persistence outside the SD.')
+    if config.get('WIFI_RMT_NVS_ENABLED') or config.get('ESP_WIFI_NVS_ENABLED'):
+        raise SystemExit('Refusing Wi-Fi credential persistence outside the SD.')
     app=ROOT/'build/tab5symbian_runtime.bin'
     if not app.is_file() or app.read_bytes()[:1]!=b'\xe9':
         raise SystemExit('Missing ESP application image.')
-    for folder in ('main','components/platform'):
+    for folder in ('main','components/platform','components/html_engine','components/javascript'):
         for p in (ROOT/folder).rglob('*'):
-            if p.suffix in ('.cpp','.hpp','.h') and p.stat().st_mtime>app.stat().st_mtime:
+            if p.suffix in ('.c','.cpp','.hpp','.h') and p.stat().st_mtime>app.stat().st_mtime:
                 raise SystemExit(f'Source newer than binary: {p}; rebuild first.')
-    if app.stat().st_size>2*1024*1024:
+    for relative in ('CMakeLists.txt','main/CMakeLists.txt','tools/patch_httpd.py','tools/patch_http_client.py','sdkconfig.defaults'):
+        source=ROOT/relative
+        if source.stat().st_mtime>app.stat().st_mtime:
+            raise SystemExit(f'Build integration newer than binary: {source}; rebuild first.')
+    if config.get('COMPILER_CXX_EXCEPTIONS_EMG_POOL_SIZE',0)<4096:
+        raise SystemExit('Browser error handling requires the C++ emergency exception pool.')
+    if config.get('FREERTOS_TASK_CREATE_ALLOW_EXT_MEM') is not True:
+        raise SystemExit('File-transfer task requires external stack support.')
+    if app.stat().st_size>4096*1024:
         raise SystemExit('Application exceeds project slot; inspect the size before distributing.')
-    DIST.mkdir(exist_ok=True)
-    shutil.copy2(app,DIST/'SymbianOS-runtime.bin')
-    subprocess.run([sys.executable,str(ROOT/'tools/package_sd.py'),'--zip',str(DIST/'SymbianOS-sdcard.zip')],check=True)
+    DIST.mkdir(parents=True,exist_ok=True)
     staged=DIST/'launcher'
     if staged.exists():shutil.rmtree(staged)
     (staged/'SymbianOS/boot').mkdir(parents=True)
     shutil.copy2(SD/'boot/manifest.txt',staged/'SymbianOS/boot/manifest.txt')
     release=SD/'system/releases'/VERSION
-    shutil.copytree(release,staged/'SymbianOS/system/releases'/VERSION)
+    shutil.copytree(release,staged/'SymbianOS/system/releases'/VERSION, ignore=shutil.ignore_patterns('.DS_Store','._*'))
     shutil.copy2(app,staged/'SymbianOS-runtime.bin')
     # Only create missing directories. Never ship user documents/preferences.
     for prefix in ('data','config','home','backups','cache','logs','tmp','update','meta','apps','themes','fonts'):
         for d in [SD/prefix]+list((SD/prefix).rglob('*')):
             if d.is_dir():(staged/'SymbianOS'/d.relative_to(SD)).mkdir(parents=True,exist_ok=True)
-    update=DIST/f'SymbianOS-update-{VERSION}.zip'
-    with zipfile.ZipFile(update,'w',zipfile.ZIP_DEFLATED)as z:
-        for p in sorted((staged/'SymbianOS').rglob('*')):
-            rel=p.relative_to(staged).as_posix()
-            if p.is_dir():z.writestr(rel+'/',b'')
-            else:z.write(p,rel)
-    install=DIST/'runtime-installation';install.mkdir(exist_ok=True)
-    args=json.loads((ROOT/'build/flasher_args.json').read_text());layout={}
-    for offset,name in args['flash_files'].items():
-        source=ROOT/'build'/name;shutil.copy2(source,install/source.name);layout[offset]=source.name
-    (install/'flash-layout.json').write_text(json.dumps({'chip':'esp32p4','flash_settings':args['flash_settings'],'files':layout,'note':'Standalone layout only; not for upload through Launcher OTA.'},indent=2)+'\n')
-    packages=DIST/'packages';packages.mkdir(exist_ok=True)
-    for source,name in [('hello','hello-1.0.0'),('theme-graphite','graphite-1.0.0')]:
-        subprocess.run([sys.executable,str(ROOT/'tools/make_package.py'),str(ROOT/'sdk'/source),str(packages/(name+'.t5pkg'))],check=True)
-    sdk_zip=DIST/f'SymbianOS-SDK-{VERSION}.zip'
-    with zipfile.ZipFile(sdk_zip,'w',zipfile.ZIP_DEFLATED)as z:
-        for p in sorted((ROOT/'sdk').rglob('*')):
-            if p.is_file():z.write(p,p.relative_to(ROOT).as_posix())
-        for name in ['tools/make_package.py','docs/SDK.md','docs/API.md','docs/FASES_4_5.md','docs/FASE_6_0_7.md','docs/CORRECOES_0_7_1.md','docs/HOTFIX_0_7_2.md','docs/HOTFIX_0_7_3.md','docs/REDES_SALVAS_0_8.md','LICENSE']:
-            z.write(ROOT/name,name)
-    notices=DIST/'licenses';notices.mkdir(exist_ok=True)
-    for name in ['minimp3-LICENSE','stb-LICENSE','sources.json']:
-        shutil.copy2(ROOT/'components/platform/vendor'/name,notices/name)
-    for component in ('esp_hosted','esp_wifi_remote','eppp_link','esp_serial_slave_link'):
-        source=ROOT/'managed_components'/('espressif__'+component)
-        for notice in source.iterdir():
-            if notice.is_file() and notice.name.lower().startswith(('license','copying','notice')):
-                shutil.copy2(notice,notices/(component+'-'+notice.name))
-    shutil.copy2(ROOT/'managed_components/espressif__esp_hosted/common/protobuf-c/LICENSE',notices/'protobuf-c-LICENSE')
-    artifacts=[sdk_zip]+sorted(packages.glob('*.t5pkg'))+[DIST/'SymbianOS-runtime.bin',DIST/'SymbianOS-sdcard.zip',update]+sorted(install.glob('*.bin'))
-    (DIST/'SHA256SUMS').write_text(''.join(digest(p)+'  '+str(p.relative_to(DIST))+'\n'for p in artifacts))
-    (DIST/'release.json').write_text(json.dumps({'version':VERSION,'runtime_version':RUNTIME_VERSION,'api':8,'application_bytes':app.stat().st_size,'application_sha256':digest(app),'sd_logical_bytes':sum(p.stat().st_size for p in SD.rglob('*')if p.is_file()),'update_zip':update.name,'required_update':['application bin','boot/manifest.txt','system/releases/0.8.0','missing data/config directories'],'preserved':['existing user documents','existing configuration','previous SD releases']},indent=2)+'\n')
-    print(f'Prepared application ({app.stat().st_size} bytes), full SD and data-preserving update package.')
+    if args.launcher_only:
+        # No partition/bootloader images, SDKs or retention cleanup in this mode.
+        (staged/'SHA256SUMS').write_text(digest(staged/'SymbianOS-runtime.bin')+'  SymbianOS-runtime.bin\n')
+        subprocess.run([sys.executable,str(ROOT/'tools/package_sd.py'),'--root',str(staged/'SymbianOS'),'--verify'],check=True)
+        subprocess.run([sys.executable,str(ROOT/'tools/prune_releases.py')],check=True)
+        print(f'Prepared Launcher WebGUI: {staged}/SymbianOS-runtime.bin and {staged}/SymbianOS/')
+        return
 
 if __name__=='__main__':main()

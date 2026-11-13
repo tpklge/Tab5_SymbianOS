@@ -185,6 +185,12 @@ void Media::cameraLoop() {
   auto nextVideoFrame = std::chrono::steady_clock::time_point::min();
   std::string recordingPath;
   while (!shutdown_) {
+    if(sleepRequested_) {
+      cameraParked_=true;
+      while(sleepRequested_&&!shutdown_)workerWait(std::chrono::milliseconds(5));
+      cameraParked_=false;
+      continue;
+    }
     auto start = std::chrono::steady_clock::now();
     bool on, recording, playing, stop;
     std::string path;

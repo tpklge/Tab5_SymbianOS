@@ -1,7 +1,9 @@
+# Launcher-compatible Tab5 layout, 16 MiB flash. Never upload this table as runtime.bin.
 # Name, Type, SubType, Offset, Size, Flags
-# Reserved NVS is infrastructure only; system/apps/preferences never use it.
 nvs, data, nvs, 0x9000, 0x5000,
 otadata, data, ota, 0xe000, 0x2000,
-ota_0, app, ota_0, 0x10000, 0x200000,
-ota_1, app, ota_1, 0x210000, 0x200000,
-# Remaining flash deliberately unallocated. No user filesystem in flash.
+app0, app, factory, 0x10000, 0x180000,
+coredump, data, coredump, 0x190000, 0x10000,
+ota_0, app, ota_0, 0x1a0000, 0x400000,
+ota_1, app, ota_1, 0x5a0000, 0x400000,
+# Free: 0x9a0000..0x1000000. User data remains on SD.

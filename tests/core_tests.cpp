@@ -98,10 +98,14 @@ int main(int argc, char **argv) {
             !runtime.faulted() && runtime.view().body == "Divisão por zero",
         "division by zero controlled failure");
   check(runtime.open("shell"), "calculator error does not stop shell");
-  auto chromePath = root / "system/releases/0.8.0/chrome.lua";
+  auto clearBootHistory = [&] {
+    fs::remove(root / "boot/confirmed.txt"); fs::remove(root / "boot/previous.txt");
+    fs::remove(root / "boot/attempt.txt"); fs::remove(root / "boot/pending.txt");
+  };
+  auto chromePath = root / "system/releases/1.0.0/themes.lua";
   auto chrome = get(chromePath);
   auto updatedChrome = chrome;
-  auto color = updatedChrome.find("26292e");
+  auto color = updatedChrome.find("17171d");
   updatedChrome.replace(color, 6, "eadfca");
   auto oldManifest = get(root / "boot/manifest.txt"),
        updatedManifest = oldManifest;
@@ -113,19 +117,22 @@ int main(int argc, char **argv) {
         "external theme changes without firmware rebuild");
   put(chromePath, chrome);
   put(root / "boot/manifest.txt", oldManifest);
-  std::string original = get(root / "system/releases/0.8.0/notes.lua");
-  put(root / "system/releases/0.8.0/notes.lua", original + "\n-- modified");
+  std::string original = get(root / "system/releases/1.0.0/notes.lua");
+  put(root / "system/releases/1.0.0/notes.lua", original + "\n-- modified");
+  clearBootHistory();
   check(!runtime.boot(), "hash mismatch prevents boot");
-  put(root / "system/releases/0.8.0/notes.lua", original);
+  put(root / "system/releases/1.0.0/notes.lua", original);
   auto manifest = get(root / "boot/manifest.txt");
   auto incompatible = manifest;
-  auto apiAt = incompatible.find("api_min=8");
-  incompatible.replace(apiAt, 9, "api_min=9");
+  auto apiAt = incompatible.find("api_min=14");
+  incompatible.replace(apiAt, 10, "api_min=0");
   put(root / "boot/manifest.txt", incompatible);
+  clearBootHistory();
   check(!runtime.boot(), "incompatible API rejected");
   put(root / "boot/manifest.txt", manifest);
   auto addApp = [&](const std::string &script) {
-    put(root / "system/releases/0.8.0/test.lua", script);
+    clearBootHistory();
+    put(root / "system/releases/1.0.0/test.lua", script);
     put(root / "boot/manifest.txt",
         manifest + "app.test=test.lua\nfile=test.lua|" + sha256(script) + "\n");
   };
@@ -136,6 +143,7 @@ int main(int argc, char **argv) {
   check(!runtime.open("test") &&
             runtime.error.find("budget") != std::string::npos,
         "instruction watchdog");
+  check(get(root/"logs/lua-fault.txt").find("kind=instruction-budget")!=std::string::npos,"bounded watchdog fault record survives script failure");
   check(runtime.open("shell"), "recover after script error");
   addApp("function event() return {body=(pcall and 'unsafe' or "
          "'safe')..(setmetatable and 'unsafe' or 'safe')} end");
@@ -147,6 +155,7 @@ int main(int argc, char **argv) {
   addApp("function event() return {body=sys.read('/../outside')} end");
   check(runtime.boot() && !runtime.open("test"), "script path confinement");
   fs::remove(root / "boot/manifest.txt");
+  clearBootHistory();
   check(!runtime.boot(), "missing manifest recovery");
   Storage absent((base / "missing").string());
   Runtime missing(absent);
@@ -171,7 +180,7 @@ int main(int argc, char **argv) {
   check(!linkedRoot.mount(), "root symlink with trailing separator rejected");
   Keyboard kb;
   check(kb.configure(
-            get(fs::path(argv[1]) / "system/releases/0.8.0/keyboard.map")),
+            get(fs::path(argv[1]) / "system/releases/1.0.0/keyboard.map")),
         "external keymap");
   check(kb.matrix(2, 1, true, 0)[0].text == "q", "matrix decoding");
   check(kb.matrix(2, 1, true, 1).empty(), "ignore duplicate press");
@@ -185,6 +194,30 @@ int main(int argc, char **argv) {
   check(kb.matrix(2, 3, true, 1)[0].text == "é", "Sym accents");
   kb.reset();
   check(kb.tick(10000).empty(), "disconnect resets keys");
+  kb.matrix(3, 0, true, 0);
+  check(kb.matrix(1, 9, true, 1)[0].text == "/",
+        "held Sym plus parenthesis types slash");
+  kb.matrix(1, 9, false, 2);
+  kb.matrix(3, 0, false, 3);
+  check(kb.matrix(3, 2, true, 4)[0].text == "a",
+        "Sym chord does not leave a latch");
+  kb.reset();
+  kb.matrix(3, 0, true, 0);
+  kb.matrix(3, 0, false, 1);
+  check(kb.matrix(1, 9, true, 2)[0].text == "/", "tapped Sym arms next slash");
+  check(kb.tick(502)[0].text == "/", "one-shot symbol repeats consistently");
+  kb.matrix(1, 9, false, 503);
+  check(kb.matrix(3, 2, true, 504)[0].text == "a",
+        "one-shot Sym consumed after printable key");
+  kb.reset();
+  kb.matrix(3, 0, true, 0);
+  kb.matrix(3, 0, false, 1);
+  kb.reset();
+  check(kb.matrix(1, 9, true, 2)[0].text == "(", "reset clears one-shot Sym");
+  kb.reset();
+  kb.matrix(3, 0, true, 0);
+  check(kb.matrix(1, 8, true, 1)[0].text == "/", "Sym-star slash alias");
+
   fs::remove_all(base);
   std::cout << checks << " checks passed\n";
 }

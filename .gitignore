@@ -13,3 +13,20 @@ __pycache__/
 # Saved Wi-Fi credentials belong to the user SD, never to the source tree.
 sdcard/SymbianOS/config/network/*
 !sdcard/SymbianOS/config/network/.gitkeep
+
+# Mail account credentials belong to the user SD.
+sdcard/SymbianOS/config/mail/*
+!sdcard/SymbianOS/config/mail/.gitkeep
+sdcard/SymbianOS/data/mail/messages/*
+!sdcard/SymbianOS/data/mail/messages/.gitkeep
+
+# Device measurement logs stay on the user SD.
+sdcard/SymbianOS/data/bench/*
+!sdcard/SymbianOS/data/bench/.gitkeep
+
+sist/
+
+# Local session notes and generated validation logs are not release sources.
+/CONTINUIDADE_CLAUDE.md
+/problemas.md
+/docs/*.log

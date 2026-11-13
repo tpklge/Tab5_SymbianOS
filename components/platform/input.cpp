@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 #include "input.hpp"
 #include <cstdlib>
-#include <sstream>
+#include "text_lines.hpp"
 namespace tab5 {
 void Keyboard::reset() {
   held_.fill(false);
   repeat_ = -1;
   accent_.clear();
+  symLatched_ = symUsed_ = repeatSymbol_ = false;
 }
 Keyboard::Keyboard() {
   normal_[0] = "escape";
@@ -20,10 +21,10 @@ Keyboard::Keyboard() {
 bool Keyboard::configure(const std::string &data) {
   std::array<std::string, 70> n{}, s{}, y{};
   std::array<bool, 70> seen{};
-  std::istringstream in(data);
+  TextLines in(data);
   std::string line;
   unsigned count = 0;
-  while (std::getline(in, line)) {
+  while (nextLine(in, line)) {
     if (line.empty() || line[0] == '#')
       continue;
     auto eq = line.find('=');
@@ -57,7 +58,7 @@ bool Keyboard::configure(const std::string &data) {
   reset();
   return true;
 }
-Input Keyboard::translate(unsigned k, bool down) {
+Input Keyboard::translate(unsigned k, bool down, bool symbol) {
   auto held = [&](const char *key) {
     for (unsigned i = 0; i < 70; ++i)
       if (normal_[i] == key && held_[i])
@@ -76,7 +77,7 @@ Input Keyboard::translate(unsigned k, bool down) {
     e.text = e.key;
     if (e.shift && !shift_[k].empty())
       e.text = shift_[k];
-    if (held("sym") && !symbol_[k].empty())
+    if ((held("sym") || symLatched_ || symbol) && !symbol_[k].empty())
       e.text = symbol_[k];
   }
   if (e.ctrl || e.alt)
@@ -91,9 +92,21 @@ std::vector<Input> Keyboard::matrix(unsigned row, unsigned col, bool down,
   if (held_[k] == down)
     return {};
   held_[k] = down;
+  if (normal_[k] == "sym") {
+    if (down)
+      symUsed_ = false;
+    else if (!symUsed_)
+      symLatched_ = !symLatched_;
+  }
   auto e = translate(k, down);
   if (down && e.key != "sym" && e.key != "shift" && e.key != "ctrl" &&
       e.key != "alt") {
+    repeatSymbol_ = symLatched_ && !e.text.empty();
+    if (!e.text.empty())
+      symLatched_ = false;
+    for (unsigned i = 0; i < 70; ++i)
+      if (normal_[i] == "sym" && held_[i])
+        symUsed_ = true;
     repeat_ = int(k);
     due_ = ms + 500;
   } else if (!down && repeat_ == int(k))
@@ -104,7 +117,7 @@ std::vector<Input> Keyboard::tick(uint64_t ms) {
   if (repeat_ < 0 || ms < due_)
     return {};
   due_ = ms + 60;
-  auto e = translate(repeat_, true);
+  auto e = translate(repeat_, true, repeatSymbol_);
   e.repeat = true;
   return {e};
 }

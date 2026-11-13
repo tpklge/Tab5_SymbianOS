@@ -38,7 +38,7 @@ std::string Digest::finish() {
   EVP_DigestFinal_ex(state_->ctx, out, nullptr);
 #endif
   const char *h = "0123456789abcdef";
-  std::string s;
+  std::string s;s.reserve(64);
   for (auto b : out) {
     s += h[b >> 4];
     s += h[b & 15];

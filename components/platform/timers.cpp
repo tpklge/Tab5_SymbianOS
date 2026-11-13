@@ -53,6 +53,8 @@ bool Runtime::acknowledgeTimer(const std::string &id, int64_t due) {
 }
 void Runtime::emitSignal(bool alarm) {
   std::lock_guard<std::mutex> lock(audioMutex_);
+  std::string tone;store_.read("/config/public/alarm_tone",tone,8);
+  media_.alertTone(tone=="soft"?1:tone=="double"?2:0);
   media_.interrupt(true);
   if (signal_)
     signal_(alarm);

@@ -1,0 +1,35 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tab5 • Transferências</title>
+<style>body{background:#252b2e;color:#edf1f3;font:17px system-ui;margin:2rem auto;max-width:750px;padding:1rem}input,button{font:inherit;padding:.7rem;border:1px solid #80909c;border-radius:7px;background:#35424c;color:inherit;margin:.3rem 0}button{cursor:pointer}li{padding:.4rem}#status{white-space:pre-wrap}small{color:#b8c7d1}</style>
+<h1>Transferências do Tab5</h1><p>Arquivos da pasta <b>home/Transfer</b> do cartão SD.</p><label>Token temporário mostrado no Tab5<br><input id="token" type="password" size="10" maxlength="8" autocomplete="off"></label><br><button id="list">Listar arquivos</button>
+<ul id="files"></ul><hr><label>Enviar arquivo (máximo 64 MiB / 67.108.864 bytes)<br><input id="file" type="file"></label><br><button id="upload">Enviar ao SD</button> <button id="cancel">Cancelar envio</button><p><small>Use nomes com letras, números, ponto, hífen e sublinhado. Arquivos existentes não são substituídos. Encerre a transferência no Tab5 para invalidar o token.</small></p><p id="status" role="status"></p>
+<script>
+'use strict';const $=id=>document.getElementById(id);let active;const MAX_UPLOAD_BYTES=64*1024*1024;
+function headers(){return {'X-Tab5-Token':$('token').value.trim().toUpperCase()}}
+function nameOK(name){return /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(name)&&!name.includes('.part')}
+async function list(){try{const r=await fetch('/files',{headers:headers(),cache:'no-store'});if(!r.ok)throw Error(await r.text());$('files').replaceChildren();for(const row of (await r.text()).trim().split('\n')){if(!row)continue;const [name,size]=row.split('\t');if(!nameOK(name))continue;const li=document.createElement('li'),b=document.createElement('button');b.textContent=name+' • '+size+' bytes';b.onclick=()=>download(name);li.append(b);$('files').append(li)}$('status').textContent='Lista atualizada.'}catch(e){$('status').textContent=e.message}}
+async function download(name){try{const r=await fetch('/file?name='+encodeURIComponent(name),{headers:headers()});if(!r.ok)throw Error(await r.text());const blob=await r.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){$('status').textContent=e.message}}
+$('list').onclick=list;
+function fileError(file){
+ if(!file)return 'Selecione um arquivo para enviar.';
+ if(file.size>MAX_UPLOAD_BYTES)return 'Arquivo muito grande ('+(file.size/(1024*1024)).toFixed(2).replace('.',',')+' MiB). O limite por arquivo é 64 MiB (67.108.864 bytes). Nada foi enviado.';
+ if(file.size===0)return 'O arquivo está vazio. Selecione um arquivo com conteúdo.';
+ if(!nameOK(file.name))return 'Nome inválido. Use letras, números, ponto, hífen ou sublinhado, sem espaços, até 120 caracteres.';
+ return '';
+}
+$('file').onchange=()=>{const error=fileError($('file').files[0]);$('upload').disabled=!!error;$('status').textContent=error||'Arquivo pronto para envio. Limite: 64 MiB.';};
+$('upload').onclick=async()=>{
+ const file=$('file').files[0],error=fileError(file);
+ if(error){$('status').textContent=error;return;}
+ active=new AbortController();$('upload').disabled=true;$('file').disabled=true;
+ try{
+  $('status').textContent='Enviando…';
+  const r=await fetch('/file?name='+encodeURIComponent(file.name),{method:'PUT',headers:headers(),body:file,signal:active.signal});
+  if(r.status===413)throw Error('Arquivo recusado: o limite por arquivo é 64 MiB (67.108.864 bytes).');
+  if(!r.ok)throw Error(await r.text());
+  await list();$('status').textContent='Arquivo enviado com sucesso: '+file.name;
+ }catch(e){
+  $('status').textContent=e.name==='AbortError'?'Envio cancelado.':(e.name==='TypeError'||e.name==='NetworkError')?'Conexão com o Tab5 interrompida. Confira o Wi-Fi e o serviço de transferência; depois tente novamente.':e.message;
+ }finally{active=null;$('file').disabled=false;$('upload').disabled=!!fileError($('file').files[0]);}
+};
+$('cancel').onclick=()=>{if(active)active.abort()};
+</script></html>

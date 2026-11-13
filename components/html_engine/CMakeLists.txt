@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+file(GLOB HTML_CORE "vendor/litehtml/src/*.cpp")
+file(GLOB GUMBO_CORE "vendor/litehtml/src/gumbo/*.c")
+set(ENGINE_SOURCES renderer.cpp allocator.cpp gumbo_memory.c readable_document.cpp ${HTML_CORE} ${GUMBO_CORE})
+set(ENGINE_INCLUDES include ../platform/include vendor/litehtml/include vendor/litehtml/include/litehtml vendor/litehtml/src vendor/litehtml/src/gumbo/include vendor/litehtml/src/gumbo/include/gumbo ../../managed_components/lvgl__lvgl/src/libs/tiny_ttf)
+if(COMMAND idf_component_register)
+ idf_component_register(SRCS ${ENGINE_SOURCES} INCLUDE_DIRS ${ENGINE_INCLUDES} REQUIRES heap)
+ set(HTML_TARGET ${COMPONENT_LIB})
+ target_compile_options(${HTML_TARGET} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fexceptions> $<$<COMPILE_LANGUAGE:CXX>:-frtti> -Os)
+else()
+ add_library(html_engine STATIC ${ENGINE_SOURCES})
+ set(HTML_TARGET html_engine)
+ target_include_directories(html_engine PUBLIC ${ENGINE_INCLUDES})
+endif()
+target_compile_features(${HTML_TARGET} PUBLIC cxx_std_17)
+
+set_source_files_properties(${GUMBO_CORE} PROPERTIES COMPILE_DEFINITIONS "malloc=tab5_html_malloc;calloc=tab5_html_calloc;realloc=tab5_html_realloc;free=tab5_html_free")

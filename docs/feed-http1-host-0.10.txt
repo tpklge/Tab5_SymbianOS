@@ -1,0 +1,8 @@
+Host HTTP/1.1 check; not ESP32-P4 validation.
+URL=https://gizmodo.com.br/feed/
+HTTP/1.1 301 Moved Permanently
+location: https://www.gizmodo.com.br/feed/
+HTTP/1.1 301 Moved Permanently
+location: https://www.gizmodo.com.br/feed
+HTTP/1.1 200 OK
+rss_bytes=25282

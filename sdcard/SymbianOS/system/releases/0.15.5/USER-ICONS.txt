@@ -1,0 +1,1 @@
+Ícones dos aplicativos fornecidos pelo usuário na pasta icons. Direitos dos assets preservados; não são classificados como artwork original MIT. Controles vetoriais restantes são originais. Mapeamento e hashes em icon-sources.json.

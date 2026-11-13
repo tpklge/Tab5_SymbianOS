@@ -5,6 +5,7 @@
 #define STBI_FREE(p) tab5::codecFree(p)
 #define STBI_ONLY_JPEG
 #define STBI_ONLY_PNG
+#define STBI_ONLY_GIF
 #define STBI_NO_STDIO
 #define STBI_MAX_DIMENSIONS 4096
 #define STB_IMAGE_IMPLEMENTATION

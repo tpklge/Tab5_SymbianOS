@@ -50,7 +50,7 @@ int Runtime::fsApi(lua_State *L) {
   const char *filter = luaL_optstring(L, 5, "");
   if (strlen(filter) > 16)
     return luaL_error(L, "invalid list filter");
-  if (n > 240 || m > 240 || memchr(path, 0, n) || memchr(other, 0, m) ||
+  if (n > 240 || m > (strcmp(op,"append")==0?4096u:240u) || memchr(path, 0, n) || memchr(other, 0, m) ||
       offset < 0)
     return luaL_error(L, "invalid file arguments");
   r->error.clear();
@@ -76,6 +76,8 @@ int Runtime::fsApi(lua_State *L) {
                         [](unsigned char c) { return std::tolower(c); });
                     auto dot = path.find_last_of('.');
                     auto ext = dot == std::string::npos ? "" : path.substr(dot);
+                    if (kind == "packages")
+                      return f.directory || (ext != ".sis" && ext != ".t5pkg");
                     if (kind == "visual")
                       return f.directory || (ext != ".jpg" && ext != ".jpeg" &&
                                              ext != ".png" && ext != ".avi");
@@ -144,6 +146,8 @@ int Runtime::fsApi(lua_State *L) {
       r->error = "file permission denied";
     } else if (operation == "mkdir")
       ok = r->store_.mkdir(p);
+    else if (operation == "append")
+      ok = r->store_.append(p, dst);
     else if (operation == "remove")
       ok = r->store_.remove(p);
     else if (operation == "copy")
@@ -320,8 +324,24 @@ int Runtime::sendApi(lua_State *L) {
   size_t n;
   const char *target = luaL_checkstring(L, 1), *e = luaL_checkstring(L, 2),
              *value = luaL_optlstring(L, 3, "", &n);
+  // A recipient executes with its own grants. Only explicitly exported
+  // service events may cross VM boundaries; apps may message themselves.
+  const std::string destination = target, event = e;
+  const bool service = destination == "services" &&
+      ((event == "mesh" && r->capability("mesh")) ||
+       ((event == "bench:start" || event == "bench:stop") &&
+        r->capability("diagnostics")) ||
+       ((event == "ack" || event == "snooze") && r->current_ == "shell"));
+  if (destination != r->current_ && !service) {
+    lua_pushboolean(L, false);
+    return 1;
+  }
   if (n > 512 || strlen(e) > 32 || strlen(target) > 32)
     return luaL_error(L, "event limit");
+  if(std::string(target)=="services" && std::string(e)=="mesh") {
+    bool ok=r->background("services","mesh",std::string(value,n));lua_pushboolean(L,ok);
+    if(!ok) {lua_pushlstring(L,r->error.data(),r->error.size());return 2;}return 1;
+  }
   if (r->messages_.size() >= 32) {
     lua_pushboolean(L, false);
     return 1;

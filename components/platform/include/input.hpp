@@ -13,9 +13,10 @@ class Keyboard {
   std::array<bool, 70> held_{};
   std::array<std::string, 70> normal_{}, shift_{}, symbol_{};
   int repeat_ = -1;
+  bool symLatched_ = false, symUsed_ = false, repeatSymbol_ = false;
   uint64_t due_ = 0;
   std::string accent_;
-  Input translate(unsigned, bool);
+  Input translate(unsigned, bool, bool symbol = false);
 
 public:
   Keyboard();

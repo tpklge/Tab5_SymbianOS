@@ -7,13 +7,14 @@ import zipfile
 import json
 
 LIMIT = 4_000_000_000
-RELEASE = '0.8.0'
+RELEASE = '1.0.0'
 def files(root):
     result=[]
     aliases=set()
     for p in root.rglob('*'):
         if p.is_symlink(): raise ValueError(f'link forbidden: {p}')
         if p.is_file():
+            if p.name == '.DS_Store' or p.name.startswith('._'):continue
             rel=p.relative_to(root)
             alias=str(rel).casefold()
             if alias in aliases:raise ValueError(f'case alias: {rel}')
@@ -33,12 +34,13 @@ def main():
     manifest=root/'boot/manifest.txt';release=root/'system/releases'/RELEASE
     catalog=json.loads((release/'release.json').read_text())
     if not args.verify:
-        entries=['format=1','api_min=8','api_max=8','schema=1',f'release={RELEASE}']
+        entries=['format=1','api_min=14','api_max=14','schema=1',f'release={RELEASE}']
         entries += [f'app.{key}={value}' for key,value in catalog['apps'].items()]
         entries += [f'grant.{key}={value}' for key,value in catalog['grants'].items()]
         entries += [f'cap.{key}={value}' for key,value in catalog['capabilities'].items()]
         for p in sorted(release.iterdir()):
-            if p.is_file() and p.name!='.gitkeep': entries.append(f'file={p.name}|{hashlib.sha256(p.read_bytes()).hexdigest()}')
+            if p.is_file() and p.name not in ('.gitkeep','.DS_Store') and not p.name.startswith('._'):
+                entries.append(f'file={p.name}|{hashlib.sha256(p.read_bytes()).hexdigest()}')
         manifest.write_text('\n'.join(entries)+'\n',encoding='utf-8')
     lines=manifest.read_text(encoding='utf-8').splitlines();verified=set()
     values={}
@@ -48,7 +50,7 @@ def main():
         if key!='file':
             if key in values:raise ValueError(f'duplicate manifest key: {key}')
             values[key]=value
-    for key,value in {'format':'1','api_min':'8','api_max':'8','schema':'1','release':RELEASE,'app.shell':'shell.lua','app.notes':'notes.lua','app.calculator':'calculator.lua'}.items():
+    for key,value in {'format':'1','api_min':'14','api_max':'14','schema':'1','release':RELEASE,'app.shell':'shell.lua','app.notes':'notes.lua','app.calculator':'calculator.lua'}.items():
         if values.get(key)!=value:raise ValueError(f'invalid manifest field: {key}')
     for line in lines:
         if line.startswith('file='):

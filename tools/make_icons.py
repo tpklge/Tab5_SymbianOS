@@ -4,6 +4,8 @@
 from pathlib import Path
 from io import BytesIO
 import struct
+import json
+import hashlib
 import cairosvg
 from PIL import Image
 ROOT=Path(__file__).resolve().parents[1]
@@ -29,9 +31,13 @@ shapes.update({
 shapes.update({
  'energy':('#8bbd6e','#3c6742','<rect x="22" y="30" width="51" height="38" rx="5" fill="none" stroke="#fff" stroke-width="6"/><path d="M75 41h6v16h-6M32 40h8v18h-8m14-18h8v18h-8m14-18h5v18h-5" fill="#fff"/>'),
  'network':('#74bacc','#32667a','<path d="M17 37q31-27 62 0M27 49q21-18 42 0M38 61q10-9 20 0" fill="none" stroke="#fff" stroke-width="7"/><circle cx="48" cy="75" r="6" fill="#fff"/>'),
+ 'updates':('#8baacb','#425c80','<path d="M72 37a27 27 0 1 0 0 25M72 18v22H50" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'),
+ 'settings':('#7b9db8','#354e6a','<circle cx="48" cy="48" r="23" fill="none" stroke="#fff" stroke-width="8"/><path d="M48 14v14m0 40v14M14 48h14m40 0h14M24 24l10 10m28 28 10 10M24 72l10-10m28-28 10-10" stroke="#fff" stroke-width="8"/>'),
+ 'lock':('#9b91c3','#4e426f','<rect x="24" y="40" width="48" height="36" rx="6" fill="#fff"/><path d="M33 42V30a15 15 0 0 1 30 0v12" fill="none" stroke="#fff" stroke-width="7"/><circle cx="48" cy="55" r="5" fill="#51456e"/>'),
  'feeds':('#e9b16d','#985933','<circle cx="25" cy="71" r="7" fill="#fff"/><path d="M23 47a26 26 0 0 1 26 26M23 24a49 49 0 0 1 49 49" fill="none" stroke="#fff" stroke-width="8"/>')
 })
 controls={
+ 'star':'<path d="m48 9 12 25 28 4-20 20 5 28-25-13-25 13 5-28L8 38l28-4z" fill="#ffd45a" stroke="#fff0b0" stroke-width="3" stroke-linejoin="round"/>',
  'volume_down':'<path d="M18 38h14l20-17v54L32 58H18z" fill="#edf5ff"/><path d="M63 48h22" stroke="#edf5ff" stroke-width="6"/>',
  'volume_up':'<path d="M18 38h14l20-17v54L32 58H18z" fill="#edf5ff"/><path d="M63 48h22M74 37v22" stroke="#edf5ff" stroke-width="6"/>',
  'play':'<path d="m32 19 43 29-43 29z" fill="#edf5ff"/>',
@@ -49,16 +55,68 @@ controls={
  'edit':'<path d="m25 63 39-41 13 13-39 41-17 6z" fill="none" stroke="#edf5ff" stroke-width="6"/>',
  'back':'<path d="M73 48H22m24-24L22 48l24 24" fill="none" stroke="#edf5ff" stroke-width="7"/>',
 }
+controls.update({
+ 'home':'<path d="m15 43 33-28 33 28M24 40v38h18V56h14v22h16V40" fill="none" stroke="#edf5ff" stroke-width="7" stroke-linejoin="round"/>',
+ 'grid':''.join(f'<rect x="{x}" y="{y}" width="14" height="14" rx="2" fill="#edf5ff"/>' for y in (20,42,64) for x in (20,42,64)),
+ 'apps':'<rect x="18" y="20" width="49" height="44" rx="4" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="M30 74h47V33M21 33h43" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'close':'<path d="m25 25 46 46m0-46L25 71" stroke="#edf5ff" stroke-width="8" stroke-linecap="round"/>',
+ 'ok':'<path d="m19 49 19 20 40-43" fill="none" stroke="#edf5ff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>',
+ 'cancel':'<circle cx="48" cy="48" r="31" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="m28 28 40 40" stroke="#edf5ff" stroke-width="6"/>',
+ 'back':'<path d="M76 48H22l22-22M22 48l22 22" fill="none" stroke="#edf5ff" stroke-width="7" stroke-linecap="round"/>',
+ 'forward':'<path d="M20 48h54L52 26m22 22L52 70" fill="none" stroke="#edf5ff" stroke-width="7" stroke-linecap="round"/>',
+ 'up':'<path d="M48 77V23L26 45m22-22 22 22" fill="none" stroke="#edf5ff" stroke-width="7"/>',
+ 'zoom_in':'<circle cx="40" cy="40" r="23" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="m57 57 22 22M26 40h28M40 26v28" stroke="#edf5ff" stroke-width="6"/>',
+ 'zoom_out':'<circle cx="40" cy="40" r="23" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="m57 57 22 22M26 40h28" stroke="#edf5ff" stroke-width="6"/>',
+ 'search':'<circle cx="40" cy="40" r="23" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="m57 57 22 22" stroke="#edf5ff" stroke-width="8"/>',
+ 'copy':'<path d="M30 21H17v51h40V59M32 15h42v42H32z" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'move':'<path d="M16 28h31v44H16zM48 48h32L68 36m12 12L68 60" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'folder':'<path d="M15 30h27l8 9h31v39H15zM58 18v25M45 30h26" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'info':'<circle cx="48" cy="48" r="31" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="M48 43v24" stroke="#edf5ff" stroke-width="7"/><circle cx="48" cy="29" r="4" fill="#edf5ff"/>',
+ 'import':'<path d="M16 63v16h64V63M48 17v43L32 44m16 16 16-16" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'export':'<path d="M16 63v16h64V63M48 62V19L32 35m16-16 16 16" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'normal':'<path d="M18 38h14l20-17v54L32 58H18z" fill="#edf5ff"/><path d="M63 32q20 16 0 32" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'silent':'<path d="M18 38h14l20-17v54L32 58H18z" fill="#edf5ff"/><path d="m65 36 19 24m0-24L65 60M18 80l62-64" stroke="#edf5ff" stroke-width="6"/>',
+ 'offline':'<path d="m13 50 30-8 1-25 9-4 6 28 20 13v8l-24-6-2 20-8 4-3-26z" fill="#edf5ff"/>',
+ 'sleep':'<path d="M49 15a30 30 0 1 0 29 43A29 29 0 0 1 49 15" fill="#edf5ff"/><path d="M60 20h19L60 39h19" fill="none" stroke="#edf5ff" stroke-width="4"/>',
+ 'brightness':'<circle cx="48" cy="48" r="18" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="M48 9v13m0 52v13M9 48h13m52 0h13M20 20l9 9m38 38 9 9M20 76l9-9m38-38 9-9" stroke="#edf5ff" stroke-width="5"/>',
+ 'charge':'<path d="M34 15v20m28-20v20M24 35h48v14q0 23-24 23T24 49zM48 72v15" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'fast':'<path d="m50 10-27 43h23l-5 33 31-48H49z" fill="#edf5ff"/>',
+ 'memory':'<rect x="25" y="25" width="46" height="46" rx="5" fill="none" stroke="#edf5ff" stroke-width="6"/><path d="M35 14v11m13-11v11m13-11v11M35 71v11m13-11v11m13-11v11M14 35h11m-11 13h11m-11 13h11m46-26h11M71 48h11M71 61h11" stroke="#edf5ff" stroke-width="5"/>',
+ 'backup':'<path d="M20 48v29h56V48M48 15v44L32 43m16 16 16-16" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'restore':'<path d="M20 48v29h56V48M48 58V15L32 31m16-16 16 16" fill="none" stroke="#edf5ff" stroke-width="6"/>',
+ 'keyboard':'<rect x="12" y="25" width="72" height="48" rx="5" fill="none" stroke="#edf5ff" stroke-width="5"/><path d="M24 37h5m10 0h5m10 0h5m10 0h5M24 49h5m10 0h5m10 0h5m10 0h5M30 61h37" stroke="#edf5ff" stroke-width="5"/>',
+})
+shapes['memory']=('#6d8fa5','#344963',controls['memory'])
+for alias,source in {'download':'import','install':'import','share':'export','open':'folder','refresh':'restore','unlock':'ok'}.items():controls[alias]=controls[source]
 for name,shape in controls.items():shapes['ui_'+name]=('#fff','#fff',shape)
+shapes['mesh_ble']=('#72bce0','#345a88','<path d="M43 14v68l25-22-38-29m13-17 25 23-38 29" fill="none" stroke="#fff" stroke-width="7"/>')
+shapes['mesh_rak']=('#76c6a2','#345c54','<path d="M48 19v57M32 76h32M34 30q-18 18 0 36m28-36q18 18 0 36M22 20q-29 28 0 56m52-56q29 28 0 56" fill="none" stroke="#fff" stroke-width="6"/>')
+shapes['browser']=shapes['network']
+provided={
+ 'themes':'themes.png','menu':'app.png','notes':'notepad.png','calculator':'calculator.png','contacts':'contacts.png',
+ 'agenda':'calendar.png','clock':'clock.png','converter':'calculator_alt.png','files':'files.png',
+ 'backup':'sdcard.png','profiles':'settings_alt.png','music':'music.png','recorder':'sound_recorder.png',
+ 'gallery':'gallery.png','camera':'camera.png','installer':'downloads.png','settings':'settings.png',
+ 'browser':'browser.png','network':'browser_alt.png','feeds':'browser.png','updates':'sync.png','memory':'app_alt.png',
+ 'mesh_ble':'mms.png','mesh_rak':'remote_control.png','lock':'sim.png'
+}
+shapes['themes']=shapes['settings']
+shapes['email']=shapes['notes']
+provided['email']='email.png'
+assert len(shapes)<=96, 'atlas icon limit exceeded'
+release=ROOT/'sdcard/SymbianOS/system/releases/1.0.0'
+metadata={name:{'file':filename,'sha256':hashlib.sha256((ROOT/'icons'/filename).read_bytes()).hexdigest()} for name,filename in provided.items()}
+(release/'icon-sources.json').write_text(json.dumps(metadata,ensure_ascii=False,indent=2)+'\n')
+(release/'USER-ICONS.txt').write_text('Ícones dos aplicativos fornecidos pelo usuário na pasta icons. Direitos dos assets preservados; não são classificados como artwork original MIT. Controles vetoriais restantes são originais. Mapeamento e hashes em icon-sources.json.\n')
 out=bytearray(b'T5IC'+struct.pack('<HH',96,len(shapes)))
 for name,(a,b,shape) in shapes.items():
  svg=f'''<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="{a}"/><stop offset="1" stop-color="{b}"/></linearGradient></defs><rect x="5" y="6" width="86" height="87" rx="19" fill="#111820" opacity=".5"/><rect x="5" y="3" width="86" height="86" rx="19" fill="url(#g)" stroke="#e7f1ff" stroke-opacity=".35"/>{shape}<path d="M20 6h56q12 0 12 15v12Q48 16 8 37V21Q8 6 20 6" fill="#fff" opacity=".13"/></svg>'''
  if name.startswith('ui_'):svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">{shape}</svg>'
  (ROOT/'artwork'/f'{name}.svg').write_text(svg)
- im=Image.open(BytesIO(cairosvg.svg2png(bytestring=svg.encode()))).convert('RGBA')
+ im=Image.open(ROOT/'icons'/provided[name]).convert('RGBA').resize((96,96),Image.Resampling.LANCZOS) if name in provided else Image.open(BytesIO(cairosvg.svg2png(bytestring=svg.encode()))).convert('RGBA')
  rgb=bytearray();alpha=bytearray()
  for r,g,b,a in im.get_flattened_data():
   rgb+=struct.pack('<H',((r>>3)<<11)|((g>>2)<<5)|(b>>3));alpha.append(a)
  out+=name.encode().ljust(16,b'\0')+rgb+alpha
-(ROOT/'sdcard/SymbianOS/system/releases/0.8.0/icons.bin').write_bytes(out)
-print(f'{len(shapes)} original icons, {len(out)} SD bytes')
+(ROOT/'sdcard/SymbianOS/system/releases/1.0.0/icons.bin').write_bytes(out)
+print(f'{len(shapes)} icons ({len(provided)} supplied app mappings), {len(out)} SD bytes')

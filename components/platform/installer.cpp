@@ -2,7 +2,7 @@
 #include "installer.hpp"
 #include <algorithm>
 #include <set>
-#include <sstream>
+#include "text_lines.hpp"
 namespace tab5 {
 static uint32_t number(const std::string &s, size_t at, int n) {
   uint32_t v = 0;
@@ -35,17 +35,22 @@ bool Installer::parse(const std::string &text, Package &p) {
     error = "invalid manifest";
     return false;
   }
-  std::istringstream lines(text);
+  TextLines lines(text);
   std::string line;
   std::map<std::string, std::string> fields;
-  while (std::getline(lines, line)) {
+  while (nextLine(lines, line)) {
     auto at = line.find('=');
     if (at == std::string::npos) {
       error = "invalid manifest line";
       return false;
     }
     auto k = line.substr(0, at), v = line.substr(at + 1);
-    if (k == "file") {
+    if(k=="depends") {
+      TextLines values(v);std::string uid,lo,hi,extra;
+      if(!nextLine(values,uid,'|')||!nextLine(values,lo,'|')||!nextLine(values,hi,'|')||nextLine(values,extra,'|')||uid.size()!=10||uid.find_first_not_of("0123456789")!=uid.npos||p.dependencies.size()>=16){error="invalid dependency";return false;}
+      uint64_t n=0;for(char c:uid)n=n*10+c-'0';if(n<0xe0000000||n>0xefffffff){error="dependency UID";return false;}
+      p.dependencies.push_back({uint32_t(n),lo,hi});
+    } else if (k == "file") {
       auto bar = v.find('|');
       if (bar == std::string::npos) {
         error = "invalid file hash";
@@ -98,19 +103,43 @@ bool Installer::parse(const std::string &text, Package &p) {
       error = "invalid version";
       return false;
     }
-  std::istringstream permissions(p.permissions);
-  while (std::getline(permissions, line, ','))
+  if(fields.count("sis_profile")) {
+    auto uid=fields["uid"];
+    if((fields["sis_profile"]!="1"&&fields["sis_profile"]!="2")||fields["license"]!="MIT"||fields["runtime_api"]!="14"||uid.size()!=10||uid.find_first_not_of("0123456789")!=uid.npos ) {error="SIS manifest profile";return false;}
+    uint64_t value=0;for(char c:uid)value=value*10+c-'0';
+    if(value<0xe0000000||value>0xefffffff||std::to_string(value)!=uid) {error="SIS UID range";return false;}
+    p.uid=uint32_t(value);p.sisProfile=fields["sis_profile"]=="2"?2:1;
+    if(p.sisProfile==1&&(!p.permissions.empty()||!p.dependencies.empty())){error="profile 1 capabilities";return false;}
+    if(p.sisProfile==2){
+      auto decimal=[&](const std::string &key,unsigned &out,bool optional){auto v=fields[key];if(optional&&v.empty()){out=0;return true;}if(v.empty()||v.size()>4||v.find_first_not_of("0123456789")!=v.npos)return false;out=unsigned(std::stoul(v));return out>0&&out<=9999&&std::to_string(out)==v;};
+      if(!decimal("schema",p.schema,false)||!decimal("migrate_from",p.migrateFrom,true)){error="data schema";return false;}
+      p.migration=fields["migration"];
+      if((p.migrateFrom && (p.migration!="migration.tsv"||!p.hashes.count(p.migration)||p.migrateFrom==p.schema))||(!p.migrateFrom&&!p.migration.empty())){error="migration contract";return false;}
+    }
+
+    unsigned parts=0;for(char c:p.version)parts+=c=='.';if(parts!=2) {error="SIS version";return false;}
+  }
+  if(!p.uid&&!p.dependencies.empty()){error="SIS dependency in legacy package";return false;}
+  if(p.uid&&!p.permissions.empty()&&p.permissions.back()==','){error="invalid SIS permissions";return false;}
+  std::set<std::string> uniquePermissions;
+  TextLines permissions(p.permissions);
+  while (nextLine(permissions, line, ',')) {
+    if(p.uid&&(line.empty()||!uniquePermissions.insert(line).second)){error="duplicate SIS permission";return false;}
     if (!line.empty() && line != "documents" && line != "media" &&
         line != "camera") {
       error = "unsupported permission";
       return false;
     }
+  }
   return true;
 }
 bool Installer::archive(const std::string &path, Package &p,
                         std::map<std::string, std::string> &files) {
   error.clear();
   files.clear();
+  std::string magic;disk_.readRange(path,0,4,magic);
+  if(path.size()>=5&&path.substr(path.size()-5)==".sisx") {error="SISX/signatures deferred";return false;}
+  if((magic.size()==4&&number(magic,0,4)==0x10201a7a)||(path.size()>=4&&path.substr(path.size()-4)==".sis"))return sisArchive(path,p,files,nullptr,true);
   std::string zip;
   if (!disk_.read(path, zip, 4 * 1024 * 1024)) {
     error = disk_.lastError();
@@ -177,6 +206,7 @@ bool Installer::archive(const std::string &path, Package &p,
   if (at != end || !files.count("manifest.txt") ||
       !parse(files["manifest.txt"], p))
     return false;
+  if(p.uid)return fail("SIS manifest requires a SIS container");
   if (files.size() != p.hashes.size() + 1)
     return fail("uncatalogued ZIP entry");
   for (const auto &f : p.hashes)
@@ -192,12 +222,18 @@ bool Installer::archive(const std::string &path, Package &p,
   p.bytes = total;
   return true;
 }
-bool Installer::inspect(const std::string &path, Package &p) {
+bool Installer::inspect(const std::string &path, Package &p,const std::atomic<bool> *cancel) {
+  std::lock_guard<std::recursive_mutex> lock(installerMutex());
+  error.clear();std::string magic;disk_.readRange(path,0,4,magic);
+  if(path.size()>=5&&path.substr(path.size()-5)==".sisx") {error="SISX/signatures deferred";return false;}
+  if((magic.size()==4&&number(magic,0,4)==0x10201a7a)||(path.size()>=4&&path.substr(path.size()-4)==".sis")) {std::map<std::string,std::string> ignored;return sisArchive(path,p,ignored,cancel,false);}
   std::map<std::string, std::string> files;
   return archive(path, p, files);
 }
 bool Installer::catalog(std::vector<Package> &out) {
+  std::lock_guard<std::recursive_mutex> lock(installerMutex());
   out.clear();
+  if(!recoverSis())return false;
   std::string registry;
   if (!disk_.read("/apps/registry.tsv", registry, 65536)) {
     if (disk_.lastError() == "not found")
@@ -205,20 +241,20 @@ bool Installer::catalog(std::vector<Package> &out) {
     error = disk_.lastError();
     return false;
   }
-  std::istringstream lines(registry);
+  TextLines lines(registry);
   std::string line;
-  std::getline(lines, line);
+  nextLine(lines, line);
   if (line != "T5APPS1") {
     error = "invalid app registry";
     return false;
   }
-  std::set<std::string> ids;
-  while (std::getline(lines, line)) {
-    std::istringstream fields(line);
+  std::set<std::string> ids;std::set<uint32_t> uids;
+  while (nextLine(lines, line)) {
+    TextLines fields(line);
     std::string id, version, hash, text;
-    std::getline(fields, id, '\t');
-    std::getline(fields, version, '\t');
-    std::getline(fields, hash);
+    nextLine(fields, id, '\t');
+    nextLine(fields, version, '\t');
+    nextLine(fields, hash);
     if (!identifier(id) || version.empty() ||
         version.find_first_not_of("0123456789.") != std::string::npos ||
         !ids.insert(id).second || out.size() >= 32 ||
@@ -231,6 +267,7 @@ bool Installer::catalog(std::vector<Package> &out) {
     Package p;
     if (!parse(text, p) || p.id != id || p.version != version)
       return false;
+    if(p.uid && !uids.insert(p.uid).second) {error="duplicate installed SIS UID";return false;}
     out.push_back(std::move(p));
   }
   return true;
@@ -244,10 +281,16 @@ static std::string registryText(const std::vector<Package> &all) {
 bool Installer::install(const std::string &path,
                         const std::atomic<bool> *cancel,
                         const std::string &expectedHash) {
+  std::lock_guard<std::recursive_mutex> lock(installerMutex());
+  std::string magic;disk_.readRange(path,0,4,magic);
+  if(magic.size()==4&&number(magic,0,4)==0x10201a7a)return installSis(path,cancel,expectedHash);
+  std::string pendingId,pendingVersion;if(pendingSis(pendingId,pendingVersion)){error="Validate or cancel pending SIS first";return false;}
   Package p;
   std::map<std::string, std::string> files;
   if (!archive(path, p, files))
     return false;
+  bool retainedSis=false;if(!disk_.pathExists("/meta/sis-data/"+p.id+".txt",retainedSis)){error=disk_.lastError();return false;}
+  if(retainedSis){error="retained SIS data requires its original UID";return false;}
   if (!expectedHash.empty() && p.archiveHash != expectedHash) {
     error = "package changed after review";
     return false;
@@ -256,6 +299,7 @@ bool Installer::install(const std::string &path,
   if (!catalog(all))
     return false;
   std::string dest = "/apps/" + p.id + "/" + p.version;
+  for(const auto &a:all)if(a.id==p.id && a.uid) {error="SIS updates deferred";return false;}
   for (const auto &a : all)
     if (a.id == p.id && a.version == p.version) {
       error = "version already active";
@@ -300,9 +344,12 @@ bool Installer::install(const std::string &path,
   return true;
 }
 bool Installer::remove(const std::string &id, bool eraseData) {
+  std::lock_guard<std::recursive_mutex> lock(installerMutex());
   std::vector<Package> all;
   if (!identifier(id) || !catalog(all))
     return false;
+  std::string pendingId,pendingVersion;if(pendingSis(pendingId,pendingVersion)){error="Validate or cancel pending SIS first";return false;}
+  for(const auto &a:all)if(a.id==id&&a.uid)return lifecycleRemove(id,eraseData);
   auto old = all.size();
   all.erase(std::remove_if(all.begin(), all.end(),
                            [&](auto &a) { return a.id == id; }),

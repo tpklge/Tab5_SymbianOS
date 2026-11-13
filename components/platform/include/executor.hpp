@@ -6,6 +6,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "freertos/idf_additions.h"
+#include "esp_heap_caps.h"
 #else
 #include <condition_variable>
 #include <mutex>
@@ -29,14 +31,16 @@ class Executor {
   bool active_ = false, stop_ = false;
 #ifdef ESP_PLATFORM
   TaskHandle_t task_ = nullptr;
+  bool capsStack_ = false;
   SemaphoreHandle_t wake_ = nullptr, done_ = nullptr;
   static void run(void *arg) {
     auto *self = static_cast<Executor *>(arg);
     for (;;) {
       xSemaphoreTake(self->wake_, portMAX_DELAY);
       if (self->stop_) {
+        const bool caps=self->capsStack_;
         xSemaphoreGive(self->done_);
-        vTaskDelete(nullptr);
+        if(caps)vTaskDeleteWithCaps(nullptr);else vTaskDelete(nullptr);
       }
       self->job_();
       xSemaphoreGive(self->done_);
@@ -49,17 +53,19 @@ class Executor {
   bool pending_ = false, finished_ = false;
 #endif
 public:
-  explicit Executor(unsigned stack = 65536, unsigned priority = 3) {
+  explicit Executor(unsigned stack = 65536, unsigned priority = 3, bool externalStack = false) {
 #ifdef ESP_PLATFORM
     wake_ = xSemaphoreCreateBinary();
     done_ = xSemaphoreCreateBinary();
-    if (wake_ && done_ &&
-        xTaskCreate(run, "symbian-worker", stack, this, priority, &task_) !=
-            pdPASS)
-      task_ = nullptr;
+    capsStack_=externalStack;
+    if(wake_&&done_) {
+      auto result=externalStack?xTaskCreateWithCaps(run,"symbian-worker",stack,this,priority,&task_,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT):xTaskCreate(run,"symbian-worker",stack,this,priority,&task_);
+      if(result!=pdPASS)task_=nullptr;
+    }
 #else
     (void)stack;
     (void)priority;
+    (void)externalStack;
     thread_ = std::thread([this] {
       std::unique_lock<std::mutex> lock(mutex_);
       for (;;) {

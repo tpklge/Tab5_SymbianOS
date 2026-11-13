@@ -1,0 +1,106 @@
+{
+  "themes": {
+    "file": "themes.png",
+    "sha256": "3978d0a127cb868f8b1b1cd356e5648724e1eb74daecb974cca51f622ba14ad6"
+  },
+  "menu": {
+    "file": "app.png",
+    "sha256": "55b896c9fef863ffa8e90d5fd0f6ad8336a02c5ae379b3ba5f6ecf30dfc0284f"
+  },
+  "notes": {
+    "file": "notepad.png",
+    "sha256": "aaa615ba1eb15956afd86243efcd115b05128ad7355ed80e57f69d32fb992bcf"
+  },
+  "calculator": {
+    "file": "calculator.png",
+    "sha256": "ade08bc84fa1331e2288fe1bf7b84a4051c7c001e94ba753fa1c33655a73ce6a"
+  },
+  "contacts": {
+    "file": "contacts.png",
+    "sha256": "3c0135c7ebe9058c159fb3260fe452f4343bc6b3dff9b4f19815a032a9e86898"
+  },
+  "agenda": {
+    "file": "calendar.png",
+    "sha256": "d7903ab20fb1f36eee20c9d6231bf658059b8c353bf1ec5d8516f3d2d98df2b4"
+  },
+  "clock": {
+    "file": "clock.png",
+    "sha256": "90ee97cde4502cbfe91679f9d24c832465c1f7c7d7da2b3e75351d2e5e9ccb84"
+  },
+  "converter": {
+    "file": "calculator_alt.png",
+    "sha256": "cc59af5b2fecc888daf9682c0a6ce9dc580e25d5f5f4619442dafd2150120339"
+  },
+  "files": {
+    "file": "files.png",
+    "sha256": "de9c9a6ada96c52de98591a6ad69e9b169a79ca282836249a9e36ac6dc32040f"
+  },
+  "backup": {
+    "file": "sdcard.png",
+    "sha256": "8c9d69e7aab33366c8e45abf173dd09089b1bd165c81643bac341a465b8862b8"
+  },
+  "profiles": {
+    "file": "settings_alt.png",
+    "sha256": "b004491a2da81f9b58350c6d698b3f59ec7c91b152025016f5eeecaf27840bf4"
+  },
+  "music": {
+    "file": "music.png",
+    "sha256": "33286cdab14801dcb85887cbe5f116e606804b1ca7c4c214915c68ef7482ce61"
+  },
+  "recorder": {
+    "file": "sound_recorder.png",
+    "sha256": "2d171b618e293b1c2e5b293785430e5eb3bdcbbb41b124c8ecfc9e2d1f07e75f"
+  },
+  "gallery": {
+    "file": "gallery.png",
+    "sha256": "ec788a77775f9d70e83b3c08ef391e9dcd7bd309269e65ae8613658ad003181f"
+  },
+  "camera": {
+    "file": "camera.png",
+    "sha256": "ab3a972a8c4d7dc1260159990b0d91f913bf88de457ab2b95115919ab0fb698a"
+  },
+  "installer": {
+    "file": "downloads.png",
+    "sha256": "a9437f13bb24b9726d4130c0c46254a3958cf53e647a292dc28b2eb0d7c921e1"
+  },
+  "settings": {
+    "file": "settings.png",
+    "sha256": "8bf2d831ce4b661c049f69d1f2246884696e81bfbf48dcc7f237cc7a67de856d"
+  },
+  "network": {
+    "file": "browser_alt.png",
+    "sha256": "6a6d96b6c871b7eae4ed32bb554a77de94d4e844fb5a2f2655f0f611ee7a8abc"
+  },
+  "feeds": {
+    "file": "browser.png",
+    "sha256": "3978260f80048aa887e02a99a6f6ad902b88a16b295abfe083bbfd43b5738d55"
+  },
+  "updates": {
+    "file": "sync.png",
+    "sha256": "fe2bda1875e8f285a4d30f0642aa6d52f75ba0600c63c31e5126b180612c4e09"
+  },
+  "memory": {
+    "file": "app_alt.png",
+    "sha256": "e3974d509b4ee2bb4165d2c74e058df972ed62a7085f97478118f144b61039d8"
+  },
+  "mesh_ble": {
+    "file": "mms.png",
+    "sha256": "72f93b459a181259c42481eba0061cda95af39c23daf5dabd2037af663411780"
+  },
+  "mesh_rak": {
+    "file": "remote_control.png",
+    "sha256": "78cb88f33a4132f41ced93dcd48fa030129d3d35994909d123fc6c6021c406f4"
+  },
+  "lock": {
+    "file": "sim.png",
+    "sha256": "ec0c5dcce3758245c8f83969e636c3b6978c26fd18e5335f98546298a2b82662"
+  },
+  "email": {
+    "file": "email.png",
+    "sha256": "ba22cc442a62414af1b1830de440e006531bbba6f3a1ac48a82f66bf16efd16d"
+  },
+  "browser": {
+    "file": "browser.png",
+    "sha256": "3978260f80048aa887e02a99a6f6ad902b88a16b295abfe083bbfd43b5738d55"
+  }
+}

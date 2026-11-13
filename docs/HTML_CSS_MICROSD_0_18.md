@@ -1,0 +1,13 @@
+# HTML/CSS no microSD — avaliação de viabilidade
+
+HTML/CSS completo não foi implementado nem anunciado como entregue na 0.18.0. O leitor existente continua limitado; suas restrições não foram removidas para esconder erros ou forçar páginas maiores. Não foi adicionado servidor auxiliar, conforme a preferência do usuário por execução no Tab5.
+
+O cartão pode armazenar módulos executáveis, fontes e recursos, mas não substitui o processador e a memória de execução. O firmware atual interpreta Lua e não oferece um ABI/carregador para um motor de navegador nativo externo. Só colocar um executável no SD não faz com que ele seja executado. A imagem já ocupa praticamente o slot de 2 MiB; mesmo a ampliação do diagnóstico OTA precisou de otimização de link para caber.
+
+Existe um caminho técnico, distinto de incorporar tudo no firmware: carregar um módulo RISC-V do SD para a PSRAM por um carregador ELF. O componente oficial espressif/elf_loader 2.1.0 declara suporte ao ESP32-P4, execução em PSRAM e relocação a partir de um arquivo. A adoção ainda requer integração no runtime, ABI para memória/fontes/imagens/arquivos, validação de integridade do módulo, tratamento de falhas e testes físicos de execução/cache. A ausência desses elementos no runtime atual é uma limitação de implementação, não uma impossibilidade universal do hardware.
+
+Foi consultado e baixado, apenas para análise em build/html-engine-probe, litehtml v0.10 (commit 9bc84b8b8d15a4e50f18b327aa30955048b441c2) e o componente ELF oficial. Nada desse código foi incorporado aos pacotes ou executado no Tab5. Litehtml implementa um motor de layout HTML com CSS2/CSS3, mas depende de uma implementação dos callbacks de fontes, desenhos, imagens, gradientes e carregamento de CSS. Sua própria documentação não o apresenta como compatibilidade integral com todos os padrões web; importá-lo não autoriza anunciar HTML/CSS completo.
+
+Próxima implementação necessária para esse caminho: liberar margem nativa para o carregador; definir e testar ABI de renderização fora da thread LVGL; compilar e verificar o módulo RISC-V; implementar layout/rasterização paginada com fontes e imagens do SD; integrar e-mail e RSS; validar tabelas, seletores/cascata, estilos embutidos/externos, flex, caracteres brasileiros, imagens e falhas de memória no host e na placa. Enquanto esse trabalho não existe, o leitor básico permanece funcional e não é rotulado como navegador completo.
+
+Fontes primárias: https://components.espressif.com/components/espressif/elf_loader/versions/2.1.0/readme ; https://github.com/litehtml/litehtml/tree/v0.10 ; https://github.com/litehtml/litehtml/blob/v0.10/include/litehtml/document_container.h .

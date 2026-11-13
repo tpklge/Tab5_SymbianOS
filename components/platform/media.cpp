@@ -254,12 +254,16 @@ bool Media::record(const std::string &path) {
   return true;
 }
 bool Media::queue(const std::vector<std::string> &paths, size_t start) {
-  if (paths.empty() || paths.size() > 64)
+  if (paths.empty() || paths.size() > 256)
     return false;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     queue_ = paths;
     queueIndex_ = std::min(start, paths.size() - 1);
+    if(shuffle_) {
+      std::swap(queue_[0],queue_[queueIndex_]);queueIndex_=0;
+      for(size_t i=queue_.size();i>2;--i) {shuffleSeed_=shuffleSeed_*1664525u+1013904223u;std::swap(queue_[i-1],queue_[1+shuffleSeed_%(i-1)]);}
+    }
   }
   return play(paths[std::min(start, paths.size() - 1)], true);
 }
@@ -333,7 +337,7 @@ Media::Info Media::info() const {
   value.progress = lastWasRecording_ ? 0
                    : end_ ? std::min<uint64_t>(100, offset_ * 100 / end_)
                           : 0;
-  value.filming = videoRecording_;
+  value.filming = videoRecording_;value.videoFrames=videoFrames_;value.videoBytes=videoBytes_;
   return value;
 }
 void Media::skip(int direction) {
@@ -349,11 +353,29 @@ void Media::skip(int direction) {
   }
   play(next, true);
 }
+bool Media::prepareSleep() {
+  auto current=info();
+  if(current.filming||current.state=="recording"||current.state=="recording_paused"||current.state=="stopping")return false;
+  stop();stopVideo();camera(false);
+  sleepRequested_=true;
+  auto end=std::chrono::steady_clock::now()+std::chrono::seconds(2);
+  while(!audioParked_||!cameraParked_) {
+    if(std::chrono::steady_clock::now()>=end){sleepRequested_=false;return false;}
+    workerWait(std::chrono::milliseconds(5));
+  }
+  return true;
+}
 void Media::loop() {
   mp3dec_t decoder{};
   uint64_t decoderGeneration = ~uint64_t(0), cacheStart = 0;
   std::string cache, recordBuffer;
   while (!shutdown_) {
+    if(sleepRequested_) {
+      audioParked_=true;
+      while(sleepRequested_&&!shutdown_)workerWait(std::chrono::milliseconds(5));
+      audioParked_=false;
+      continue;
+    }
     std::string state, path;
     uint64_t generation, offset, end;
     unsigned rate, channels;
@@ -433,8 +455,11 @@ void Media::loop() {
           std::lock_guard<std::mutex> lock(mutex_);
           if (generation == generation_ && state_ == "playing") {
             state_ = "idle";
-            if (queueIndex_ + 1 < queue_.size())
-              next = queue_[++queueIndex_];
+            if(!queue_.empty()) {
+              if(repeat_==2) next=queue_[queueIndex_];
+              else if(queueIndex_+1<queue_.size()) next=queue_[++queueIndex_];
+              else if(repeat_==1) {queueIndex_=0;next=queue_[0];}
+            }
           }
         }
         if (!next.empty())
@@ -633,7 +658,7 @@ bool Media::imageData(const std::string &encoded, unsigned zoom,
   }
   auto *rgb =
       stbi_load_from_memory(reinterpret_cast<const uint8_t *>(encoded.data()),
-                            encoded.size(), &width, &height, &channels, 3);
+                            encoded.size(), &width, &height, &channels, 4);
   if (!rgb) {
     std::lock_guard<std::mutex> lock(mutex_);
     error_ = "JPEG/PNG decoding failed";
@@ -651,16 +676,18 @@ bool Media::imageData(const std::string &encoded, unsigned zoom,
   pic->width = std::max(1u, unsigned(width * scale));
   pic->height = std::max(1u, unsigned(height * scale));
   pic->pixels.resize(pic->width * pic->height * 2);
+  if(channels==2||channels==4)pic->alpha.resize(pic->width*pic->height);
   for (unsigned y = 0; y < pic->height; ++y)
     for (unsigned x = 0; x < pic->width; ++x) {
       unsigned src = (uint64_t(y) * height / pic->height * width +
                       uint64_t(x) * width / pic->width) *
-                     3;
+                     4;
       uint16_t c = ((rgb[src] >> 3) << 11) | ((rgb[src + 1] >> 2) << 5) |
                    (rgb[src + 2] >> 3);
       size_t at = (y * pic->width + x) * 2;
       pic->pixels[at] = c & 255;
       pic->pixels[at + 1] = c >> 8;
+      if(!pic->alpha.empty())pic->alpha[y*pic->width+x]=rgb[src+3];
     }
   stbi_image_free(rgb);
   std::lock_guard<std::mutex> lock(mutex_);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "network.hpp"
+#include "text_lines.hpp"
 #include <algorithm>
-#include <sstream>
 namespace tab5 {
 namespace {
 constexpr const char *profilePath = "/config/network/known-wifi.tsv";
@@ -39,9 +39,9 @@ bool Network::loadProfiles(std::vector<Profile> &list) {
     return disk_.lastError() == "not found";
   if (data.rfind("T5WIFI1\n", 0) != 0 || data.back() != '\n')
     return false;
-  std::istringstream input(data.substr(8));
+  TextLines input(data.substr(8));
   std::string row;
-  while (std::getline(input, row)) {
+  while (nextLine(input, row)) {
     auto a = row.find('\t'),
          b = row.find('\t', a == std::string::npos ? 0 : a + 1);
     if (a == std::string::npos || b == std::string::npos ||
@@ -132,7 +132,23 @@ bool Network::setAutomatic(const std::string &ssid, bool enabled) {
     }
   return false;
 }
-bool Network::autoConnect(uint64_t nowMs) {
+void Network::pollSignal(uint64_t nowMs) {
+  if (nowMs < nextSignalMs_ || !backend.signal)
+    return;
+  auto value = status();
+  if (value.busy || !value.connected)
+    return;
+  nextSignalMs_ = nowMs + 5000;
+  int signal = backend.signal();
+  std::lock_guard<std::mutex> lock(mutex_);
+  status_.signal = signal;
+  status_.signalValid = signal >= -126 && signal <= 0;
+}
+bool Network::autoConnect(uint64_t nowMs, bool refreshSignal) {
+  if (recovering_ || (backend.restartRequired && backend.restartRequired()))
+    return false;
+  if (refreshSignal)
+    pollSignal(nowMs);
   if (autoSuppressed_ || nowMs < nextAutoMs_)
     return false;
   auto state = status();
@@ -167,7 +183,7 @@ bool Network::autoConnect(uint64_t nowMs) {
         candidates.push_back(profiles.front());
     }
     bool ok = false;
-    std::string address, ssid;
+    std::string address, ssid, password;
     for (auto &p : candidates) {
       if (cancel_)
         break;
@@ -175,14 +191,20 @@ bool Network::autoConnect(uint64_t nowMs) {
           backend.connect(p.ssid, p.password, address, cancel_) && !cancel_) {
         ok = true;
         ssid = p.ssid;
+        password = p.password;
         break;
       }
     }
     {
       std::lock_guard<std::mutex> lock(mutex_);
       status_.connected = ok;
+      status_.signalValid = false;
       status_.address = ok ? address : "";
       status_.ssid = ssid;
+      if (ok) {
+        lastSsid_ = ssid;
+        lastPassword_ = password;
+      }
     }
     finish(ok, ok ? "Conectado automaticamente"
                : backend.diagnostic

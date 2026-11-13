@@ -126,9 +126,9 @@ int main(int argc, char **argv) {
               runtime.view().result == "1000 m",
           "converter has a dedicated result field");
     check(runtime.open("shell") && runtime.dispatch("menu") &&
-              runtime.view().buttons.size() == 9 &&
-              runtime.view().tools.size() == 1,
-          "nine menu apps and separate paging control");
+              runtime.view().buttons.size() == 12 && runtime.view().columns == 4 &&
+              runtime.view().tools.size() >= 2,
+          "twelve menu apps and separate paging control");
     check(runtime.open("notes") && runtime.dispatch("save", "Nota original"),
           "save legacy note");
     check(runtime.dispatch("new", "Nota original") &&
@@ -148,8 +148,8 @@ int main(int argc, char **argv) {
           "open saved note without losing another");
     check(get(root / "data/notes/document.txt") == "Nota original",
           "legacy note preserved");
-    check(runtime.view().tools.size() >= 3 &&
-              runtime.view().tools[0].icon == "ui_save",
+    check(runtime.view().tools.size() >= 2 && !runtime.view().footer.empty() &&
+              runtime.view().footer[0].icon == "ui_save",
           "note editor has icon actions");
     check(runtime.open("music") && runtime.view().layout == "player" &&
               runtime.view().tools.size() >= 4,
@@ -176,6 +176,9 @@ int main(int argc, char **argv) {
           "recording timer advances with captured audio");
     check(runtime.media().info().level > 0,
           "recording level follows PCM samples");
+    check(!runtime.media().prepareSleep(),"sleep refuses unfinished audio recording");
+    runtime.media().pause();
+    check(!runtime.media().prepareSleep(),"sleep refuses paused recording");
     auto start = std::chrono::steady_clock::now();
     runtime.media().stop();
     check(std::chrono::steady_clock::now() - start <
@@ -183,6 +186,8 @@ int main(int argc, char **argv) {
           "record stop does not wait for microphone read");
     check(wait([&] { return runtime.media().status().rfind("idle", 0) == 0; }),
           "recording finalized asynchronously");
+    check(runtime.media().prepareSleep(),"sleep waits for audio/video workers to park");
+    runtime.storage().pause();check(runtime.storage().mount(),"SD remount after parked workers");runtime.media().resumeSleep();
     auto au = get(root / "home/Recordings/voice.au");
     check(au.size() > 8000 && au.substr(0, 4) == ".snd" && big(au, 12) == 1 &&
               big(au, 16) == 8000 && big(au, 20) == 1,
@@ -230,6 +235,7 @@ int main(int argc, char **argv) {
                    std::string::npos;
           }),
           "video frames and duration advance");
+    check(!runtime.media().prepareSleep(),"sleep refuses unfinished video recording");
     runtime.media().stopVideo();
     runtime.media().camera(false);
     check(wait([&] { return fs::exists(root / "home/Pictures/test.avi"); }),

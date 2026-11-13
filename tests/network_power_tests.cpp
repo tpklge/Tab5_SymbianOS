@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
       return true;
     });
     check(runtime.open("energy") &&
-              runtime.view().text.find("55%") != std::string::npos,
+              !runtime.view().statusFields.empty() && runtime.view().statusFields[0].value.find("55%") != std::string::npos,
           "power UI uses cached measurement");
     check(runtime.dispatch("fast") && *modes == "fast",
           "QC requested through power capability");
@@ -158,8 +158,9 @@ int main(int argc, char **argv) {
           }) &&
               wait([&] { return !net.status().busy; }),
           "RSS downloaded");
-    check(runtime.open("feeds") &&
-              runtime.view().text.find("Olá & mundo") != std::string::npos,
+    check(disk.read("/data/feeds/latest.xml", data) && disk.write("/data/feeds/cache-gizmodo.xml",data),"feed-specific cached snapshot");
+    check(runtime.open("feeds") && runtime.dispatch("source:gizmodo") &&
+              !runtime.view().buttons.empty() && runtime.view().buttons[0].label.find("Olá & mundo") != std::string::npos,
           "feed titles shown without markup");
     std::string upload(12000, 'x');
     size_t offset = 0;
@@ -186,7 +187,7 @@ int main(int argc, char **argv) {
     check(net.receive(
               "/home/Transfer/large-upload.bin",
               [&](char *out, size_t n) {
-                check(n <= 4096, "upload read size stays bounded");
+                check(n <= 65536, "upload read size stays bounded");
                 memset(out, 'u', n);
                 generated += n;
                 return int(n);
@@ -327,7 +328,7 @@ int main(int argc, char **argv) {
           "Wi-Fi password field masked");
     check(disk.write("/config/public/profile", "offline"), "offline profile");
     check(runtime.dispatch("connect", "test\npassword") &&
-              runtime.view().text.find("Não foi possível") != std::string::npos,
+              runtime.view().body.find("Não foi possível") != std::string::npos,
           "offline profile refuses connection");
   }
   fs::remove_all(temp);

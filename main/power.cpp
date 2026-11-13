@@ -37,6 +37,7 @@ bool setMode(const std::string &mode) {
 } // namespace
 void tab5_setup_power(tab5::Runtime &runtime) {
   runtime.setPowerWriter(setMode);
+  runtime.screenWriter=[](int percent) { bsp_display_brightness_set(percent); };
 }
 void tab5_poll_power(tab5::Runtime &runtime) {
   tab5::PowerInfo info;

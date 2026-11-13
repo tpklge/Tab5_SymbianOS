@@ -299,7 +299,7 @@ int main(int argc, char **argv) {
     check(r.view().background == "202329",
           "apply theme without firmware update");
     action("default_theme");
-    check(r.view().background == "26292e", "restore original theme");
+    check(r.view().background == "17171d", "restore original theme");
   }
   fs::remove_all(base);
   std::cout << checks.load() << " media/installer checks passed\n";

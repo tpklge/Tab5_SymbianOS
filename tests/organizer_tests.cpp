@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     check(r.tick(), "service tick: " + r.error);
   };
   check(r.boot(), "boot extended release: " + r.error);
-  check(r.view().background == "26292e" && r.view().foreground == "f2f3f5",
+  check(r.view().background == "17171d" && r.view().foreground == "f5f6f8",
         "dark theme external");
   check(radioCalls == 1 && !offline, "boot applies radio profile");
   open("notes");
@@ -385,7 +385,7 @@ int main(int argc, char **argv) {
       "sys.send('mailbox','late','')elseif e=='late'then n=n+1 elseif "
       "e=='explode'then while true do end end;return "
       "{title='Mailbox',body=tostring(n),buttons={}}end";
-  put(root / "system/releases/0.8.0/mailbox.lua", mailbox);
+  put(root / "system/releases/1.0.0/mailbox.lua", mailbox);
   put(root / "boot/manifest.txt",
       manifest + "app.mailbox=mailbox.lua\nfile=mailbox.lua|" +
           sha256(mailbox) + "\n");

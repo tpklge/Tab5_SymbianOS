@@ -2,18 +2,17 @@
 #pragma once
 #include "executor.hpp"
 #include "storage.hpp"
+#include "picture.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <memory>
 namespace tab5 {
-struct Picture {
-  unsigned width = 0, height = 0;
-  std::string pixels;
-};
 class Media {
   Storage &disk_;
+  std::atomic<bool> sleepRequested_{false}, audioParked_{false}, cameraParked_{false};
   std::atomic<int> volume_{60};
+  std::atomic<unsigned> alertTone_{0};
   Executor worker_{65536, 5}, cameraWorker_{32768, 2};
   std::atomic<bool> shutdown_{false}, interrupt_{false};
   mutable std::mutex mutex_;
@@ -32,6 +31,7 @@ class Media {
   void cameraLoop();
   std::vector<std::string> queue_;
   size_t queueIndex_ = 0;
+  unsigned repeat_=0;bool shuffle_=false;uint32_t shuffleSeed_=1729;
   uint64_t generation_ = 0;
   std::shared_ptr<Picture> picture_;
   void loop();
@@ -59,20 +59,26 @@ public:
   bool record(const std::string &);
   void setVolume(int v) { volume_ = std::max(0, std::min(100, v)); }
   int volume() const { return volume_; }
+  void alertTone(unsigned tone){alertTone_=std::min(2u,tone);}
+  unsigned alertTone() const{return alertTone_;}
   bool playbackGeneration(uint64_t generation) const {
     std::lock_guard<std::mutex> lock(mutex_);
     return generation == generation_ &&
            (state_ == "playing" || state_ == "paused");
   }
+  bool prepareSleep();
+  void resumeSleep(){sleepRequested_=false;}
   void stop();
   void pause();
   void skip(int);
+  void playbackMode(unsigned repeat, bool shuffle) { std::lock_guard<std::mutex> lock(mutex_);repeat_=repeat;shuffle_=shuffle; }
   struct Info {
     std::string state, path, error;
     double seconds = 0, total = 0;
     unsigned level = 0;
     unsigned progress = 0;
     bool filming = false;
+    uint64_t videoFrames=0,videoBytes=0;
   };
   Info info() const;
   bool camera(bool);

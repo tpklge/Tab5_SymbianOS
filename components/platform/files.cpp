@@ -3,10 +3,11 @@
 #include "storage.hpp"
 #include <algorithm>
 #include <cstdio>
+#include <cerrno>
 #include <cstring>
 #include <dirent.h>
 #include <set>
-#include <sstream>
+#include "text_lines.hpp"
 #include <sys/stat.h>
 #include <unistd.h>
 #ifdef ESP_PLATFORM
@@ -23,6 +24,13 @@ static int info(const char *p, struct stat *s) {
 #endif
 }
 static bool cancelled(const std::atomic<bool> *c) { return c && c->load(); }
+bool Storage::pathExists(const std::string &p,bool &exists) {
+ std::lock_guard<std::recursive_mutex> lock(mutex_);std::string real;exists=false;
+ if(!resolve(p,real))return false;
+ struct stat st{};if(info(real.c_str(),&st)==0){exists=true;return true;}
+ if(errno==ENOENT)return true;
+ error="cannot inspect path";return false;
+}
 uint64_t Storage::physicalFree() const {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
 #ifndef ESP_PLATFORM
@@ -39,7 +47,7 @@ uint64_t Storage::physicalFree() const {
 #endif
 }
 bool Storage::room(uint64_t bytes) {
-  if (!reconcile())
+  if (!online_)
     return false;
   uint64_t ceiling = limit_ > reserve_ ? limit_ - reserve_ : 0;
   if (used_ > ceiling || bytes > ceiling - used_) {
@@ -136,7 +144,7 @@ bool Storage::listDir(const std::string &p, std::vector<File> &entries) {
       ok = false;
       break;
     }
-    entries.push_back({logical, S_ISDIR(st.st_mode) ? 0 : uint64_t(st.st_size),
+    entries.push_back({logical, S_ISDIR(st.st_mode) ? 0 : storageStatBytes(st.st_size),
                        S_ISDIR(st.st_mode)});
     if (entries.size() > 10000) {
       error = "directory entry limit";
@@ -162,11 +170,49 @@ bool Storage::move(const std::string &src, const std::string &dst) {
     error = "destination exists";
     return false;
   }
+  if (info(a.c_str(), &st)) {
+    error = "move source unavailable";
+    return false;
+  }
+  if (S_ISDIR(st.st_mode)) {
+    if (dst.rfind(src + "/", 0) == 0) {
+      error = "cannot move a directory into itself";
+      return false;
+    }
+    // Validate every rebased descendant, including empty directories, before
+    // changing the live tree. A valid destination alone is insufficient.
+    std::vector<std::string> pending{src};
+    size_t visited = 0;
+    while (!pending.empty()) {
+      auto dir = pending.back();
+      pending.pop_back();
+      auto rebased = dst + dir.substr(src.size());
+      if (!validPath(rebased) ||
+          std::count(rebased.begin(), rebased.end(), '/') > 16) {
+        error = "moved directory exceeds path/depth limit";
+        return false;
+      }
+      std::vector<File> children;
+      if (!listDir(dir, children))
+        return false;
+      for (const auto &child : children) {
+        if (++visited > 20000 ||
+            !validPath(dst + child.path.substr(src.size()))) {
+          error = "moved subtree exceeds path/tree limit";
+          return false;
+        }
+        if (child.directory)
+          pending.push_back(child.path);
+      }
+    }
+  }
   if (rename(a.c_str(), b.c_str())) {
     error = "move failed";
     return false;
   }
-  return reconcile();
+  // A rename changes no logical bytes. Avoid a post-commit audit that could
+  // report failure after the operation has already changed the tree.
+  return true;
 }
 bool Storage::copy(const std::string &src, const std::string &dst,
                    const std::atomic<bool> *cancel) {
@@ -183,7 +229,7 @@ bool Storage::copy(const std::string &src, const std::string &dst,
     error = "destination exists";
     return false;
   }
-  if (!room(st.st_size))
+  if (!room(storageStatBytes(st.st_size)))
     return false;
   std::string temp = b + ".t5-new";
   if (info(temp.c_str(), &other) == 0) {
@@ -195,13 +241,13 @@ bool Storage::copy(const std::string &src, const std::string &dst,
   bool ok = in && out;
   char buffer[4096];
   uint64_t count = 0;
-  while (ok && count < uint64_t(st.st_size)) {
+  while (ok && count < storageStatBytes(st.st_size)) {
     if (cancelled(cancel)) {
       ok = false;
       break;
     }
     size_t want =
-               std::min<uint64_t>(sizeof(buffer), uint64_t(st.st_size) - count),
+               std::min<uint64_t>(sizeof(buffer), storageStatBytes(st.st_size) - count),
            n = fread(buffer, 1, want, in);
     if (n != want || fwrite(buffer, 1, n, out) != n) {
       ok = false;
@@ -266,8 +312,8 @@ bool Storage::backup(const std::string &dest, const std::atomic<bool> *cancel) {
   all.erase(std::remove_if(all.begin(), all.end(),
                            [](auto &f) { return excluded(f.path); }),
             all.end());
-  if (all.size() > 2048) {
-    error = "backup limited to 2048 files";
+  if (all.size() > 4096) {
+    error = "backup limited to 4096 files";
     return false;
   }
   uint64_t bytes = 16 + 64;
@@ -381,7 +427,7 @@ bool Storage::restore(const std::string &source,
   unsigned char header[16];
   read(header, 16);
   uint64_t count = ok ? decode(header + 8, 8) : 0;
-  if (!ok || memcmp(header, "T5BAK001", 8) || count > 2048) {
+  if (!ok || memcmp(header, "T5BAK001", 8) || count > 4096) {
     fclose(in);
     error = "invalid backup header";
     return false;
@@ -526,7 +572,7 @@ bool Storage::recoverRestore() {
   struct stat st{};
   if (info(planFile.c_str(), &st))
     return true;
-  if (!S_ISREG(st.st_mode) || st.st_size > 1024 * 1024) {
+  if (!S_ISREG(st.st_mode) || storageStatBytes(st.st_size) > 2 * 1024 * 1024) {
     error = "invalid restore journal";
     return false;
   }
@@ -551,7 +597,7 @@ bool Storage::recoverRestore() {
                     uint64_t size) {
     struct stat s{};
     if (info(p.c_str(), &s) || !S_ISREG(s.st_mode) ||
-        uint64_t(s.st_size) != size)
+        storageStatBytes(s.st_size) != size)
       return false;
     FILE *in = fopen(p.c_str(), "rb");
     if (!in)
@@ -564,9 +610,9 @@ bool Storage::recoverRestore() {
     fclose(in);
     return good;
   };
-  std::istringstream lines(plan.substr(11));
+  TextLines lines(plan.substr(11));
   std::string line;
-  while (std::getline(lines, line)) {
+  while (nextLine(lines, line)) {
     auto a = line.find('|'),
          b = line.find('|', a == std::string::npos ? 0 : a + 1);
     if (a == std::string::npos || b == std::string::npos) {
@@ -586,7 +632,7 @@ bool Storage::recoverRestore() {
       return false;
     }
     uint64_t size = strtoull(sizeText.c_str(), nullptr, 10);
-    if (size > limit_ || items.size() >= 2048) {
+    if (size > limit_ || items.size() >= 4096) {
       error = "restore limit";
       return false;
     }

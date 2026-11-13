@@ -51,3 +51,29 @@ Registrar resultados reais e falhas. Só então avaliar a passagem dos critério
 ## Aceitação 0.8.0
 
 O usuário confirmou envio de arquivo bem-sucedido após a correção do upload. Ainda testar: conectar e salvar, reiniciar com AP presente/ausente, reconectar após queda, desligar conexão automática por rede, perfil Offline, desconexão manual, conectar sem salvar e esquecer. Conferir que nenhuma senha aparece na interface/diagnóstico e que a preferência persiste no SD. Testar token de oito caracteres, renovação ao reabrir o serviço e invalidação ao encerrar.
+
+
+## Aceitação 0.9.0 — pendente
+
+Conferir feed HTTPS e redirects com rede real; em falha, obter `/logs/network.txt` (código TLS/flags/heap). Enviar 30 MB pela página recarregada; verificar hash no SD, repetição após perda de Wi-Fi, cancelamento e limite 64 MiB. Diagnóstico: `/logs/last-upload.txt`. Testar brilho/tela apagada com música e despertar por touch/teclado sem executar a primeira tecla. Medir corrente e comparar health.txt em ensaio prolongado.
+
+Em cartão e dados de teste, conferir retomada temporizada de deep sleep, RTC, persistência, remoção/reinserção e instalação acima da quota. Validar boot interrompido e fallback de release; OTA no slot inativo, SHA inválido, interrupção antes/depois de selecionar boot e confirmação após 15 s. Identificar se o bootloader realmente instalado pelo launcher suporta rollback nativo. Nenhum teste físico desses foi executado pelo agente.
+
+
+## Aceitação 0.10.0 — pendente
+
+O usuário confirmou upload funcionando. Testar novo feed/cabeçalhos; se falhar, registrar network.txt com errno/TLS. Conferir três temas, Home, pastas/favoritos/lista e persistência do Menu; energia compacta; PIN por touch e teclado, rascunho antes de bloquear e retomada do app. Conferir calendário, playlists, zoom/arraste e cache de artigos sem rede. Testar suspensão em memória sem retornar ao launcher, com verificação do SD e reconexão de redes salvas. OTA e atualização própria ficam para a próxima validação física, por solicitação do autor.
+
+
+## Bancada 0.17.0 — preparada, execução física pendente
+
+O layout permanece em paisagem. Configurações permite idiomas PT/EN/ES e tons do alarme. Testes e medições registra em /SymbianOS/data/bench; anotar cartão/fonte/cabo, revisão da placa e caso executado. Cada segmento informa runtime/release, intervalo, origem e colunas. `host` não equivale a medição física.
+
+- Multimídia: começar um registro de 5 s, usar música + Notas e disparar alarme, registrar pausa/retomada e áudio observado. Iniciar vídeo e comparar contadores/bytes/fps do intervalo; anotar resolução e temperatura. Repetir com monitor desligado para avaliar sua interferência.
+- Rede: registrar 30 s durante downloads/uploads/feeds/e-mail, cancelar e interromper o AP; conferir resultado/arquivo e espaço. Não coletar senhas ou conteúdo de mensagens no relatório.
+- Energia: registrar pack por 30 s; comparar condições idênticas e usar instrumento externo para potência USB/autonomia. Não inferir consumo só da porcentagem.
+- OTA: Revisar OTA somente verifica arquivos; usar Atualizações para a aplicação autorizada pelo usuário. Em cópia de SD, validar hash incorreto, arquivo incompleto, rollback e corte de energia em cada etapa. Conferir suporte do bootloader efetivamente instalado.
+- E-mail: arquivo binário conhecido com hash antes/depois, exportação sem sobrescrever, cancelamento SMTP e conferência de envio incerto no provedor; exclusão local após reiniciar; recebimento em pasta IMAP, restauração e troca de UIDVALIDITY. Testar falta de espaço preservando uma mensagem já cacheada.
+- Contatos/idiomas: favorito A–Z, backup/restore, três tons reais, salvar idioma/reiniciar, conteúdo digitado e nomes de arquivos inalterados; PIN e teclado oficial sob carga.
+
+O agente não executou flash/monitor/serial nem cortes de energia nesta entrega.

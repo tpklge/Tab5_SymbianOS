@@ -1,0 +1,10 @@
+# Duktape is MIT, upstream license in vendor/LICENSE.txt.
+if(COMMAND idf_component_register)
+ idf_component_register(SRCS "vendor/duktape.c" INCLUDE_DIRS "vendor")
+ set(JS_TARGET ${COMPONENT_LIB})
+else()
+ add_library(tab5_javascript STATIC vendor/duktape.c)
+ target_include_directories(tab5_javascript PUBLIC vendor)
+ set(JS_TARGET tab5_javascript)
+endif()
+target_compile_options(${JS_TARGET} PRIVATE -Os)

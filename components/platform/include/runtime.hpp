@@ -3,7 +3,12 @@
 #include "installer.hpp"
 #include "media.hpp"
 #include "network.hpp"
+#include "mail.hpp"
+#include "mail_document.hpp"
+#include "html_engine.hpp"
 #include "power.hpp"
+#include "releases.hpp"
+#include "lock.hpp"
 #include "storage.hpp"
 #include <chrono>
 #include <ctime>
@@ -15,8 +20,9 @@ struct lua_State;
 struct lua_Debug;
 namespace tab5 {
 struct Button {
-  std::string id, label, subtitle, icon;
+  std::string id, label, subtitle, icon, close;
   std::shared_ptr<const Picture> thumbnail;
+  bool outgoing=false;
 };
 struct ScheduledNotice {
   std::string id, text;
@@ -30,14 +36,22 @@ struct Notice {
 struct FormControl {
   std::string label, type, options, keys;
 };
+struct StatusField { std::string label,value;int percent=-1; };
+struct MemoryInfo {uint64_t internalTotal=0,internalFree=0,internalLargest=0,internalMinimum=0,psramTotal=0,psramFree=0,psramLargest=0;bool available=false;};
 struct View {
   std::string left, right, home, menu, switcher, keyboard;
   std::string layout, fields, result;
   std::string title, body, text, background = "292b2f", accent = "454a52",
                                  foreground = "eeeeee", fieldColor = "34373c";
-  std::vector<Button> buttons, tools;
+  std::vector<Button> buttons, tools, footer, sidebar;
+  std::vector<StatusField> statusFields;
+  std::vector<MailBlock> document;
+  std::vector<HtmlHotspot> htmlHotspots;
+  std::vector<HtmlLink> documentLinks;
+  std::string scrollKey,submitAction,optionAction,profile,profileLabel,optionLabel,language;
+  unsigned refreshMs=0,columns=0;bool centerTools=false;
   std::vector<FormControl> controls;
-  std::shared_ptr<const Picture> picture;
+  std::shared_ptr<const Picture> picture, wallpaper;
   bool field = false, classic = false, list = false, readonly = false,
        mediaStatus = false;
 };
@@ -55,12 +69,25 @@ class Runtime {
   };
   Storage &store_;
   Media media_;
+  std::string wallpaperName_, resumeApp_="shell";
+  std::shared_ptr<const Picture> wallpaper_;
+  static int securityApi(lua_State *);
+  static int memoryApi(lua_State *);
+  static int radioApi(lua_State *);
   Network network_;
+  Mail mail_;
+  HtmlEngine html_;HtmlResult htmlLast_;std::string htmlFont_,htmlCss_;
+  static int htmlApi(lua_State *);
+  bool prepareHtml(lua_State *,View &);
+  std::unique_ptr<MailMessage> eventMail_;
+  bool readEventMail(const std::string &, MailMessage &);
+  static int mailApi(lua_State *);
   std::map<std::string, Package> installed_;
   std::map<std::string, std::shared_ptr<const Picture>> thumbnails_;
   std::map<std::string, std::shared_ptr<const Picture>> pictures_;
   std::string reviewedPath_, reviewedHash_, pictureOwner_;
   bool refreshInstalled();
+  bool bootManifest(const std::string &);
   std::map<std::string, std::unique_ptr<VM>> apps_;
   std::map<std::string, std::string> entries_;
   std::map<std::string, std::vector<std::string>> grants_;
@@ -71,7 +98,7 @@ class Runtime {
   std::string current_, release_, apiPath_, apiScratch_;
   std::map<std::string, std::string> verified_;
   View view_;
-  bool ready_ = false;
+  std::atomic<bool> ready_{false};
   uint64_t serial_ = 0;
   std::atomic<bool> cancelled_{false};
   std::vector<Notice> notices_;
@@ -138,6 +165,17 @@ class Runtime {
   std::function<bool(const std::string &)> powerWriter_;
 
 public:
+  std::function<void(unsigned)> bootProgress;
+  std::function<bool(const std::string &,const std::string &,std::string &)> radioCommand;
+  std::function<MemoryInfo()> memoryReader;
+  Lock lock;
+  std::function<std::string()> entropy;
+  std::atomic<bool> suspended{false};
+  std::atomic<int> brightness{100};
+  std::atomic<unsigned> screenMinutes{2};
+  std::atomic<bool> screenOffRequested{false};
+  std::function<void(int)> screenWriter;
+  std::function<bool(const std::string &, std::string &)> systemWriter;
   PowerInfo powerInfo() const {
     std::lock_guard<std::mutex> lock(powerMutex_);
     return power_;
@@ -150,12 +188,13 @@ public:
     powerWriter_ = std::move(fn);
   }
   std::string error;
-  explicit Runtime(Storage &s) : store_(s), media_(s), network_(s) {
+  explicit Runtime(Storage &s) : store_(s), media_(s), network_(s), mail_(s), lock(s) {
     setClock(std::time(nullptr));
   }
   ~Runtime();
   bool asset(const std::string &, std::string &, size_t maximum = 1024 * 1024);
   bool boot();
+  bool checkpointApps();
   bool dispatch(const std::string &, const std::string &value = "");
   bool open(const std::string &);
   bool close(const std::string &);
@@ -166,6 +205,7 @@ public:
     return ++serial_;
   }
   void cancel() { cancelled_ = true; }
+  bool operationCancelled() const { return cancelled_.load(); }
   std::vector<ScheduledNotice> pollTimers();
   bool timerTriggered(const std::string &, int64_t) const;
   bool acknowledgeTimer(const std::string &, int64_t);
@@ -191,6 +231,7 @@ public:
   }
   Media &media() { return media_; }
   Storage &storage() { return store_; }
+  Mail &mail() {return mail_;}
   Network &network() { return network_; }
 };
 } // namespace tab5

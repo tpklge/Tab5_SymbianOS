@@ -1,0 +1,65 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tab5 • Transferências</title>
+<style>
+:root{color-scheme:dark;font:15px system-ui;background:#101b24;color:#edf4f7}body{max-width:1000px;margin:auto;padding:24px}h1{margin:0;font-size:26px}h2{font-size:19px;margin:0 0 12px}p,small{color:#afc2cf}section{background:#192b38;border:1px solid #314a5b;border-radius:14px;padding:20px;margin:20px 0}input,button{font:inherit;color:inherit;border:1px solid #486577;border-radius:7px;padding:9px 12px;background:#243e50}button{cursor:pointer}button:hover{background:#31586c}button:disabled{opacity:.5;cursor:default}#upload,#list{background:#176b78}input[type=file]{max-width:100%;box-sizing:border-box}#token{letter-spacing:3px;width:130px}.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}#files{list-style:none;padding:0;max-height:400px;overflow:auto}#files li{display:flex;gap:8px;align-items:center;border-bottom:1px solid #314a5b;padding:6px 0;font-size:14px}.filename{flex:1;overflow-wrap:anywhere}.size{color:#afc2cf;font-variant-numeric:tabular-nums}#files button{padding:5px 9px}.job{border-top:1px solid #314a5b;padding:12px 0}.job p{margin:4px 0;overflow-wrap:anywhere}progress{width:100%;height:13px;accent-color:#4bd1bd}.failed{color:#ffb1a5}.success{color:#79e2bf}#status{white-space:pre-wrap;min-height:24px}footer{font-size:13px;color:#afc2cf}@media(max-width:550px){body{padding:12px}section{padding:13px}#files li{flex-wrap:wrap}.filename{min-width:60%}}
+</style>
+<header><h1>Arquivos do Tab5</h1><p>Envie e organize arquivos no cartão, em <b>SymbianOS/home/Transfer</b>.</p></header>
+<section aria-label="Conexão"><div class="toolbar"><label>Token do Tab5 <input id="token" type="password" maxlength="8" autocomplete="off" aria-label="Token temporário"></label><button id="list">Conectar / Atualizar</button></div><p id="status" role="status" aria-live="polite">Informe o token exibido no Tab5.</p></section>
+<section><h2>Arquivos no cartão</h2><ul id="files"><li>Conecte para consultar os arquivos.</li></ul></section>
+<section><h2>Enviar arquivos</h2><p>Selecione um ou vários arquivos. Máximo de 64 MiB por arquivo; nomes de até 100 caracteres, sem espaços. Arquivos existentes são preservados.</p><div class="toolbar"><input id="file" type="file" multiple aria-label="Arquivos para enviar"><button id="upload">Enviar ao SD</button><button id="cancel">Cancelar atual</button></div><div id="jobs" aria-label="Histórico de envios"></div><small>O progresso mostra os bytes confirmados pelo Tab5. Resultados e erros permanecem abaixo enquanto esta página estiver aberta. Se houver falha, corrija a causa e selecione novamente o arquivo.</small></section>
+<footer>Use o serviço na mesma rede Wi-Fi. Encerre “Enviar arquivos” no Tab5 para invalidar o token. Atualizações do sistema são feitas pelo launcher.</footer>
+<script>
+'use strict';const $=id=>document.getElementById(id);let active;const MAX_UPLOAD_BYTES=64*1024*1024;
+function headers(){return {'X-Tab5-Token':$('token').value.trim().toUpperCase()}}
+function nameOK(name){return /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(name)&&!name.includes('.part')}
+async function list(){try{const r=await fetch('/files',{headers:headers(),cache:'no-store'});if(!r.ok)throw Error(await r.text());const text=await r.text();$('files').replaceChildren();let count=0;for(const row of text.trim().split('\n')){if(!row)continue;const [name,size]=row.split('\t');if(!nameOK(name))continue;count++;const li=document.createElement('li'),label=document.createElement('span'),bytes=document.createElement('span'),get=document.createElement('button'),del=document.createElement('button');label.className='filename';label.textContent=name;bytes.className='size';bytes.textContent=formatBytes(Number(size));get.textContent='Baixar';get.onclick=()=>download(name);del.textContent='Apagar';del.onclick=async()=>{if(!confirm('Apagar “'+name+'” do cartão?'))return;del.disabled=true;try{const reply=await fetch('/file?name='+encodeURIComponent(name),{method:'DELETE',headers:headers()});if(!reply.ok)throw Error(await reply.text());await list();$('status').textContent='Arquivo apagado: '+name;}catch(e){$('status').textContent=e.message;del.disabled=false;}};li.append(label,bytes,get,del);$('files').append(li)}if(!count){const empty=document.createElement('li');empty.textContent='Nenhum arquivo nesta pasta.';$('files').append(empty)}$('status').textContent='Conectado · '+count+' arquivo(s).'}catch(e){$('status').textContent=e.message}}
+function formatBytes(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KiB':(n/1048576).toFixed(1)+' MiB'}
+function job(file){const row=document.createElement('div'),title=document.createElement('p'),bar=document.createElement('progress'),detail=document.createElement('p');row.className='job';title.textContent=file.name+' · '+formatBytes(file.size);bar.max=file.size;bar.value=0;detail.textContent='Na fila';row.append(title,bar,detail);$('jobs').append(row);return {row,bar,detail}}
+async function download(name){try{const r=await fetch('/file?name='+encodeURIComponent(name),{headers:headers()});if(!r.ok)throw Error(await r.text());const blob=await r.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){$('status').textContent=e.message}}
+$('list').onclick=list;
+function fileError(file){
+ if(!file)return 'Selecione um arquivo para enviar.';
+ if(file.size>MAX_UPLOAD_BYTES)return 'Arquivo muito grande ('+(file.size/(1024*1024)).toFixed(2).replace('.',',')+' MiB). O limite por arquivo é 64 MiB (67.108.864 bytes). Nada foi enviado.';
+ if(file.size===0)return 'O arquivo está vazio. Selecione um arquivo com conteúdo.';
+ if(!nameOK(file.name))return 'Nome inválido. Use letras, números, ponto, hífen ou sublinhado, sem espaços, até 100 caracteres.';
+ return '';
+}
+$('file').onchange=()=>{const error=Array.from($('file').files).map(fileError).find(Boolean)||fileError($('file').files[0]);$('upload').disabled=!!error;$('status').textContent=error||'Arquivos prontos para envio. Limite: 64 MiB por arquivo.';};
+$('upload').onclick=async()=>{
+ const files=Array.from($('file').files),error=files.map(fileError).find(Boolean)||fileError(files[0]);
+ if(error){$('status').textContent=error;return;}
+ $('upload').disabled=true;$('file').disabled=true;
+ try{const queue=files.map(file=>({file,view:job(file)}));for(let i=0;i<queue.length;i++){const item=queue[i];const ok=await sendFile(item.file,item.view);if(!ok){for(const remaining of queue.slice(i+1)){remaining.view.detail.textContent='Não enviado: fila interrompida. Selecione novamente para tentar.';remaining.view.row.className='job failed';}break;}}}
+ finally{$('file').disabled=false;$('upload').disabled=!!fileError($('file').files[0]);}
+};
+async function sendFile(file,view){
+ active=new AbortController();let session='';
+ try{
+  $('status').textContent='Enviando…';
+  session=Array.from(crypto.getRandomValues(new Uint8Array(8)),n=>n.toString(16).padStart(2,'0')).join('');
+  for(let offset=0;offset<file.size;){
+   const end=Math.min(offset+65536,file.size),body=file.slice(offset,end);
+   const url='/file?name='+encodeURIComponent(file.name)+'&session='+session+'&offset='+offset+'&total='+file.size;
+   for(let attempt=0;;attempt++){
+    try{
+     const r=await fetch(url,{method:'PUT',headers:headers(),body,signal:active.signal});
+     if(!r.ok){const error=Error(await r.text());error.permanent=r.status>=400&&r.status<500&&r.status!==408;throw error;}
+     await r.text();break;
+    }catch(e){
+     if(e.name==='AbortError'||e.permanent||attempt>=3)throw e;
+     $('status').textContent='Reconectando e repetindo bloco…';
+     await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)));
+    }
+   }
+   offset=end;view.bar.value=offset;view.detail.textContent='Confirmado no SD: '+Math.floor(offset*100/file.size)+'% ('+(offset/1048576).toFixed(1)+' MiB)';
+  }
+  view.row.className='job success';view.detail.textContent='Enviado com sucesso · '+formatBytes(file.size)+' confirmados no SD';await list();$('status').textContent='Arquivo enviado com sucesso: '+file.name;return true;
+ }catch(e){
+  view.row.className='job failed';view.detail.textContent=(e.name==='AbortError'?'Cancelado pelo usuário':e.name==='TypeError'||e.name==='NetworkError'?'Conexão interrompida. Confira o Wi-Fi e o serviço no Tab5.':('Falha: '+e.message))+' · '+formatBytes(view.bar.value)+' confirmados';$('status').textContent=view.detail.textContent;
+  // A lost final acknowledgement may mean the destination already exists.
+  // Cancellation only discards this session's partial file, never its target.
+  if(session){try{const response=await fetch('/file?name='+encodeURIComponent(file.name)+'&session='+session,{method:'DELETE',headers:headers()});if(!response.ok)throw Error(await response.text());}catch(cleanup){view.detail.textContent+=' · Não foi possível encerrar a sessão: '+cleanup.message+'. Confira a lista e reabra o serviço antes de tentar novamente.';}}
+  return false;
+ }finally{active=null;}
+}
+$('cancel').onclick=()=>{if(active)active.abort()};
+</script></html>

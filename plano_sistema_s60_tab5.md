@@ -1,6 +1,25 @@
 # Plataforma para M5Stack Tab5 inspirada no S60 5th Edition
 
-Plano revisado — 7 de novembro de 2026.
+> **Estado publicado: 1.0.0 / API 14.** O usuário confirmou funcionamento dos ajustes R3 em 13/11/2026. A publicação mantém compatibilidade limitada, descrita em [Limitações 1.0.0](docs/LIMITACOES_1_0_0.md). Esta atualização de estado substitui referências históricas a validações pendentes e versões locais; não certifica testes físicos exaustivos. Atualização de firmware permanece exclusiva pelo launcher.
+
+
+## SIS sem assinatura — fases 5 e 6
+
+Implementados atualização, dependências/ciclos, novas permissões revisadas, esquema de dados com migração declarativa, downgrade confirmado, primeira abertura com recuperação, rollback com snapshot e remoção transacional. SDK e kit de testes originais são gerados com `python3 -B tools/release_sis.py`. Contrato: [Ciclo de vida SIS](docs/SIS_CICLO_DE_VIDA.md). Validação física pendente: [Roteiro físico SIS](docs/ROTEIRO_FISICO_SIS.md). Esta seção substitui os estados históricos abaixo que indicam essas etapas como futuras. SISX e assinaturas continuam adiados para a fase final. Tudo persiste no SD; firmware continua pelo launcher.
+
+## SIS sem assinatura — fases 1 a 4
+
+Implementados contrato, ferramentas de host, inspeção e instalação transacional para aplicações Lua no [Perfil SIS 1](docs/PERFIL_SIS_1.md). A validação física no Tab5 está pendente. Este estado substitui a indicação anterior de SIS apenas planejado. Assinaturas/SISX ficam para a última fase; atualizações de firmware continuam exclusivamente pelo launcher.
+
+## Decisão vigente: navegador e atualizações pelo launcher
+
+Na revisão 20261113-R3, o navegador abre em leitura nativa, oferece HTML/CSS e imagens com limites explícitos, JavaScript inline ES5 básico, formulários GET/POST e cookies/sessões no SD. Os controles usam ícones em coluna estreita e os links aceitam toque; a compatibilidade com sites modernos permanece parcial. A tela PIN aceita OK por toque ou Enter no teclado físico oficial. Estado dos seis itens e roteiro físico: [Navegador, e-mail e feeds R3](docs/NAVEGADOR_EMAIL_FEEDS_20261113_R3.md). A causa exata da queda anterior e os testes físicos desta revisão permanecem pendentes.
+
+Atualizações do runtime passam exclusivamente pelo launcher. Ficam abandonados o aplicativo e o fluxo de OTA interno, incluindo kits de atualização gerados para esse fluxo. A interface web autenticada por token continua para transferência de arquivos. Referências anteriores a OTA neste documento registram decisões históricas e não autorizam reintrodução desse mecanismo.
+
+Pacotes SIS/SISX ficam somente planejados em [Plano de pacotes](docs/PLANO_PACOTES_SIS_SISX.md); o instalador atual não passa a reconhecer essas extensões. Wi-Fi foi confirmado funcionando pelo usuário; o teste físico de e-mail foi adiado para a próxima implementação.
+
+Plano revisado — 8 de novembro de 2026.
 
 ## 1. Objetivo e requisitos obrigatórios
 
@@ -21,7 +40,7 @@ Os seguintes requisitos prevalecem em toda a implementação:
 
 A quota é de armazenamento, não de RAM. O cartão pode ter capacidade maior e outras pastas utilizadas por outros projetos; o sistema não deve alterá-las.
 
-Nenhum firmware foi compilado ou medido no Tab5 durante este planejamento. Orçamentos e latências são metas a validar fisicamente.
+Na redação inicial deste planejamento não havia firmware compilado. As implementações e evidências posteriores estão nos relatórios de build; orçamentos e latências continuam exigindo medição física.
 
 ## 2. Referência histórica e documentação
 
@@ -158,7 +177,7 @@ As prioridades a seguir são propostas do projeto, não afirmações de que as i
 | Rádio FM | Receptor externo; rádio pela internet é outra função | Extensão de hardware ou app de streaming. |
 | Vibração | Depende de atuador adicional | Não prometer feedback tátil no hardware básico. |
 | Bluetooth do Nokia | BLE para funções específicas; sem equivalência com Bluetooth clássico | C6 documenta Bluetooth LE [S13]; fones A2DP clássicos e OBEX não devem ser prometidos. |
-| SIS/SISX, JAR e widgets antigos | Não suportados pela plataforma proposta | Exigiriam emulação/runtime e compatibilidade de APIs separados. |
+| SIS/SISX e JAR próprios | Investigar execução de aplicativos próprios, com perfil de compatibilidade explícito | Não implica suporte geral aos binários comerciais antigos; definir runtime/ABI para SIS/SISX e perfil Java/JVM para JAR. |
 | Lojas e serviços Nokia antigos | Catálogo próprio opcional | Não depender da infraestrutura histórica. |
 
 Para mensagens, um cliente via Wi-Fi ou integração Meshtastic por módulo externo são possibilidades. Isso não significa SMS nem garante que toda mensagem tenha confirmação de entrega. O provedor deve informar capacidades e estados reais: pendente, enviado, confirmado quando houver protocolo para isso, falhou e recebido.
@@ -532,3 +551,77 @@ As fontes históricas abaixo são documentação original Nokia/Symbian preserva
 FatFs/VFS [S20–S21] fornecem integração com o cartão; confinamento por pasta, quota e transações descritos neste plano são funcionalidades a desenvolver sobre essa base. Não presumir uma quota de diretório pronta no FatFs.
 
 As versões `stable`, `latest` e `master` podem mudar. Na Fase 0, arquivar os identificadores exatos das versões e commits utilizados, além dos URLs.
+
+
+## 16. Extensões aprovadas e evolução da experiência — 08/11/2026
+
+As extensões abaixo integram o planejamento, por solicitação do autor. Não estão implementadas apenas por constarem aqui. Orientação permanece fixa em paisagem, com teclado; rotação automática fica fora da entrega atual.
+
+### Fase 8 — Experiência pessoal e aplicações
+
+Home com relógio/data, próximos compromissos, notificações e atalhos configuráveis. Menu com grade/lista, favoritos, pastas e ordenação persistente. Pelo menos três temas originais com papéis de parede geométricos coloridos, escolhas persistidas no SD e restauração. Configurações de brilho, tema, hora e segurança. Bloqueio por PIN numérico de quatro dígitos com verificador salgado, limitação de tentativas e teclado numérico touch; trata-se de bloqueio da interface, não criptografia do cartão. Agenda mensal/semanal interativa e formulários brasileiros. Música com biblioteca paginada e playlists nomeadas/editáveis/persistentes, repetição e aleatório. Galeria com zoom, deslocamento e navegação entre fotos. Feeds com assinaturas persistentes, lista de artigos e leitura offline do conteúdo disponível no RSS/Atom. Energia com formulários e poucos comandos. Corrigir retomada da suspensão no próprio runtime, evitando novo boot no launcher. OTA e atualização ficam para aceitação física na próxima versão.
+
+### Fase 9 — Mensagens Meshtastic pelo módulo RAK e BLE
+
+Provedor real Meshtastic usando módulo RAK externo. Antes do driver, identificar modelo, firmware, interface física (UART/BLE), pinagem e alimentação; não assumir uma variante RAK específica. Usar protocolo público e manter o rádio Meshtastic responsável pela malha. Mensagens, contatos/nós, canais, caixa de saída offline e histórico ficam em /SymbianOS. Distinguir pendente, entregue ao rádio, enviado e confirmado quando o protocolo trouxer confirmação; deduplicar IDs, retentar com limites e mostrar falhas reais. Não equivale a SMS nem garante entrega sem conectividade à malha.
+
+BLE será uma capacidade própria via C6, com busca, pareamento/reconexão, permissões e provedores GATT definidos. Pode ser um transporte para o módulo RAK quando modelo/firmware suportarem. Validar coexistência com Wi-Fi e versões P4/C6 antes de prometer uso simultâneo. Não assumir Bluetooth clássico/A2DP/OBEX.
+
+### Fase 10 — E-mail com operação offline
+
+Cliente com IMAP para recebimento e SMTP para envio, TLS e validação de certificados/relógio. Escolher inicialmente um perfil de autenticação reproduzível; OAuth depende de provedor/cadastro e deve ter escopo próprio. Contas/segredos permanecem no SD com política explícita de proteção. Pastas, índice, mensagens baixadas, rascunhos e caixa de saída ficam disponíveis offline. Escrever/responder sem rede; sincronizar e enviar depois, preservando estados e evitando duplicações. Anexos terão limites, streaming e contabilização na quota; conteúdo HTML deve ser sanitizado ou convertido em texto. Testar conflitos entre exclusões locais/remotas, sincronização interrompida, expiração de credenciais e esgotamento do cartão. Não anunciar envio antes da confirmação do servidor.
+
+### Fase 11 — Aplicativos próprios SIS/SISX e JAR: prova de viabilidade
+
+Investigar separadamente instalação (formato do pacote) e execução (CPU/ABI/APIs). Para SIS/SISX próprios, definir se haverá subconjunto compatível com Symbian, emulação de binários ou toolchain própria com adaptação; medir RAM/flash e licenças. Ler/extrair um SIS não executa seu programa. Renomear um pacote Lua para .sis/.sisx não constitui compatibilidade.
+
+Para JAR próprios, definir perfil Java suportado (por exemplo um subconjunto Java ME), VM/interpretador ou tradução antecipada, UI, arquivos, rede e áudio mediados pela API do sistema. Não prometer suporte simultâneo a Java desktop, Android ou qualquer MIDlet antigo. Primeiro marco: um aplicativo próprio por formato inicia, recebe teclado/touch, salva somente sob a raiz e encerra de forma controlada. Medir custo e decidir se o runtime cabe no hardware antes da adoção; eventual distribuição independente não pode embutir apps/recursos do sistema na flash. Só habilitar formatos efetivamente implementados e testados.
+
+### Fase 12 — Consolidação e distribuição
+
+Validar feed real (incluindo cabeçalhos/redirects), uploads, energia e uso prolongado. O usuário confirmou upload após a 0.9.0; preservar esse resultado sem extrapolar para todos os cartões/redes. OTA/rollback, corte de energia e retomada devem ser exercitados em cartão de teste. Reduzir o residente antes de ampliar APIs: a versão 0.9.0 deixou somente 3184 bytes no slot de 2 MiB. Não alterar partições do launcher automaticamente. Assinaturas e política de confiança precedem um catálogo remoto de apps.
+
+### Refinamento entregue localmente em 0.11.0 / API 11
+
+Fase 8: Ajustes centraliza brilho/som por sliders e acesso ao PIN; carga/perfis em listas; ações com ícones e rodapé; perfil na barra superior; estados de rede automáticos; Memória com heap/PSRAM e memória Lua; alternador compacto com fechamento X; refinamento de organizador, arquivos, galeria, backup e instalador. RSS trata espera temporária e verifica integridade do corpo. Testes de host, sanitizadores e build não substituem aceitação física. OTA continua pendente conforme combinado.
+
+### Entrega local 0.12.0 / API 12
+
+Home da fase 8 com prévias de notificações/compromissos e três atalhos configuráveis, spinner junto à bateria e espaçamento do alternador. Fase 9 implementada inicialmente com apps Meshtastic BLE e RAK/Grove, transporte nativo limitado e protocolo/persistência no SD. Nó/canais e fila offline com estados de envio explícitos; não modifica parâmetros RF. Host testa sincronização, IDs, codificação e fila; build P4 inclui NimBLE. Aceitação física de firmware C6, RAK, pareamento, confirmação, coexistência, RSS e OTA permanece pendente. Fases 10/11 seguem planejadas.
+
+### Correções locais 0.12.1
+
+RAK/Grove com recepção independente do tick Lua, fila limitada em PSRAM e diagnóstico. Memória: buffers priorizam PSRAM e pilhas dos executores UI/rede foram dimensionadas; medição de heap/stacks e RSS na placa ainda pendente. Wi-Fi com nível na barra; menu em grade de quatro colunas/lista de duas; PIN aceita sequência de eventos sem esperar cada render. Testes de host/sanitizadores e build P4 são separados de validação física, inclusive UART/C6 e OTA.
+
+### Entrega local 0.13.0
+
+Interface inspirada nas referências fornecidas, ícones da pasta icons por instrução explícita do usuário, sem copiar bitmaps dos exemplos. Home com relógio/agenda/notificações, chat em balões, controles de Menu centralizados a 10 px da base, paisagem preservada. Quota com saldo incremental serializado durante uso; auditoria/recovery em remontagem. Indicador apenas para operações foreground, RAK com comando confirmado e RSS recebido em RAM com tentativa limitada. Testes host/sanitizadores/build separados da medição física.
+
+### Incremento Meshtastic 0.14.0
+
+Envio e recebimento RAK confirmados pelo usuário na 0.13.3. A 0.14.0 acrescenta composição inline, seletor de canal/destinatário, mensagens privadas filtradas, painel de nós e nome local. Administração de canais locais assíncrona com passkey, proteção do primário e confirmação por releitura. Paginação inferior e textos direcionais. Testes host/LVGL/sanitizadores e build P4 separados de aceitação física pendente da nova versão; não encerra toda a fase 9. URL/QR de canais e parâmetros LoRa permanecem futuros. Detalhes em docs/MESHTASTIC_0_14.md.
+
+
+### Incremento e-mail 0.15.0 / API 14
+
+Fase 10 parcialmente implementada: IMAP/POP3 e SMTP, portas editáveis, senhas de envio/recebimento independentes, TLS direto e STARTTLS, cache textual, rascunhos e fila offline com confirmação SMTP e reenvio incerto manual. Uma conta ativa, sem OAuth. Anexos e aceitação física de servidores permanecem pendentes. Detalhes e limites em [E-mail 0.15.0](docs/EMAIL_0_15.md). Usuário confirmou estabilidade/diagnóstico 0.14.5; Meshtastic pausado para outra ocasião.
+
+
+### Atualização de estado — 0.16.0, 10/11/2026
+
+O autor confirmou recebimento de e-mail após a correção do modo de recepção SDIO em 0.15.12. Implementado leitor visual limitado compartilhado entre e-mail e RSS/Atom: HTML sanitizado/adaptado, imagens MIME/CID persistentes, imagens externas por ação explícita com cache limitado, leitura textual alternativa e artigos HTML salvos offline. Não equivale a navegador completo nem a suporte de anexos gerais. Mensagens antigas podem ser baixadas novamente porque o cache anterior descartava HTML/imagens. Ver [HTML e imagens](docs/HTML_EMAIL_RSS_0_16.md).
+
+A revisão solicitada até a fase 10 está em [Pendências](docs/PENDENCIAS_ATE_FASE_10.md). Mantém privadas Meshtastic pausadas e OAuth adiado, distingue funcionalidades ausentes de aceitação física e não encerra fases apenas com build/testes de host.
+
+
+### Atualização de estado — 0.17.0, 10/11/2026
+
+Atendida a solicitação de implementação dos itens 3, 4, 6, 7, 8 e 10 da revisão: favoritos e seleção de alarme, instrumentação de multimídia/rede/energia/OTA, interfaces EN/ES além de PT e anexos/conflitos locais de e-mail. Coleta é executável no próprio Tab5, com origem/versão/intervalo e rotação no SD; revisão OTA é somente inspect. Testes controlados de host não são medições de consumo, corte de energia ou validação da flash. Ver [entrega e limites](docs/FASES_3_4_6_7_8_10_0_17.md). Privadas Meshtastic e OAuth seguem adiados. Espelhamento IMAP completo continua separado do perfil local/offline.
+
+
+### Revisão 0.18.0 — OTA e motor HTML/CSS no SD
+
+Validador OTA compartilhado com testes sobre o BIN real, relatório de etapa/capacidade/hash e cancelamento sem falha de app. Aceitação OTA física continua pendente. HTML/CSS completo no microSD não entregue: há caminho técnico via módulo ELF RISC-V/PSRAM, mas requer novo carregador/ABI e port do motor; ver docs/HTML_CSS_MICROSD_0_18.md. O leitor limitado atual não deve ser apresentado como implementação completa.
+
+
+Atualização 0.19.0: leitor HTML/CSS litehtml para e-mail/RSS, recursos no SD, pastas por ícones, repetição SMTP rejeitado somente por ação manual, gravação incremental de medições. Mapa launcher com dois slots OTA de 4 MiB. Ver docs/HTML_CSS_0_19.md para limites e validação; testes físicos desta versão pendentes.

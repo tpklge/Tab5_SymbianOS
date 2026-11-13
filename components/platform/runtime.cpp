@@ -1,7 +1,11 @@
+#include "html_allocation_scope.hpp"
 // SPDX-License-Identifier: MIT
 #include "runtime.hpp"
+#include "http_fetch.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
+#include "esp_log.h"
+#include <sys/time.h>
 #endif
 #include <climits>
 #ifndef LLONG_MAX
@@ -18,7 +22,7 @@ extern "C" {
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <sstream>
+#include "text_lines.hpp"
 namespace tab5 {
 Runtime::VM::~VM() {
   if (L)
@@ -26,12 +30,15 @@ Runtime::VM::~VM() {
 }
 Runtime::~Runtime() { shutdown(); }
 void Runtime::shutdown() {
-  network_.cancel();
+  html_.reset();htmlLast_={};htmlFont_.clear();htmlCss_.clear();
+  mail_.stop();
+  network_.disconnect();
   media_.stop();
   media_.stopVideo();
   media_.camera(false);
   installed_.clear();
   pictures_.clear();
+  wallpaper_.reset();wallpaperName_.clear();
   thumbnails_.clear();
   pictureOwner_.clear();
   timersEnabled_ = false;
@@ -117,9 +124,10 @@ int Runtime::readApi(lua_State *L) {
   if (!r->permission(r->apiPath_))
     return luaL_error(L, "app data permission denied");
   r->apiPath_.assign(p, n);
-  if (!r->store_.read(r->apiPath_, r->apiScratch_, 65536)) {
+  std::string why;
+  if (!r->store_.readWithError(r->apiPath_, r->apiScratch_, why, 65536)) {
     lua_pushnil(L);
-    lua_pushstring(L, r->store_.lastError().c_str());
+    lua_pushstring(L, why.c_str());
     return 2;
   }
   lua_pushlstring(L, r->apiScratch_.data(), r->apiScratch_.size());
@@ -229,7 +237,7 @@ bool Runtime::parseView(lua_State *L) {
     return false;
   }
   View v;
-  v.layout = field(L, "layout", 32);
+  v.layout = field(L, "layout", 32);v.language=field(L,"language",8);
   v.result = field(L, "result", 512);
   if (v.layout == "camera" && !capability("camera")) {
     error = "camera view denied";
@@ -239,6 +247,29 @@ bool Runtime::parseView(lua_State *L) {
     error = "video view denied";
     return false;
   }
+  if(v.layout=="mail_html" || v.layout=="html") {
+    const bool email=v.layout=="mail_html";
+    if(!capability(email?"mail":"network")){error="document capability denied";return false;}
+    MailMessage m;std::string html,base=field(L,"baseUrl",4096);
+    if(email){if(readEventMail(field(L,"mailId",24),m))html=m.html;}
+    else html=field(L,"html",96*1024);
+    v.document=mail::document(html);size_t pixels=0,images=0;
+    for(auto &block:v.document)if(!block.source.empty() && images++<6) {
+      std::string encoded;auto cid=block.source.rfind("cid:",0)==0?block.source.substr(4):block.source;
+      for(const auto &image:m.images)if(image.cid==cid){encoded=image.data;break;}
+      if(encoded.empty() && block.source.rfind("data:image/",0)==0){auto comma=block.source.find(',');if(comma<80 && block.source.substr(0,comma).find(";base64")!=std::string::npos)encoded=mail::unbase64(block.source.substr(comma+1));}
+      if(encoded.empty()){
+        std::string url,why;if(Network::validUrl(block.source))url=block.source;
+        else if(!base.empty())resolveHttpRedirect(base,block.source,url,why);
+        if(Network::validUrl(url)){block.source=url;store_.read(Network::imageCachePath(url),encoded,256*1024);}
+      }
+      if(!encoded.empty() && pixels<2*1024*1024){std::shared_ptr<const Picture> pic;if(media_.imageData(encoded,1,&pic)){if(pixels+pic->pixels.size()<=2*1024*1024){pixels+=pic->pixels.size();block.picture=pic;}}}
+    }
+    if(email){MailBlock header;header.runs.push_back({std::string(v.language=="en"?"From: ":v.language=="es"?"De: ":"De: ")+m.from+(v.language=="en"?"\nTo: ":v.language=="es"?"\nPara: ":"\nPara: ")+m.to+(v.language=="en"?"\nDate: ":v.language=="es"?"\nFecha: ":"\nData: ")+m.date});v.document.insert(v.document.begin(),std::move(header));}
+  }
+  v.profileLabel=field(L,"profileLabel",48);v.optionLabel=field(L,"optionLabel",48);
+  v.scrollKey=field(L,"scrollKey",64);
+  v.submitAction=field(L,"submit",64);
   v.fields = field(L, "fields", 512);
   if (pictures_.count(current_) &&
       (v.layout == "image" || v.layout == "image_zoom" || v.layout == "photo"))
@@ -273,12 +304,13 @@ bool Runtime::parseView(lua_State *L) {
       }
       FormControl c{field(L, "label", 128), field(L, "type", 16),
                     field(L, "options", 4096), field(L, "keys", 1024)};
-      if (c.type != "text" && c.type != "password" && c.type != "date" &&
-          c.type != "time" && c.type != "select") {
+      if (c.type != "text" && c.type != "multiline" && c.type != "password" && c.type != "date" &&
+          c.type != "time" && c.type != "select" && c.type != "pin" && c.type != "slider") {
         lua_pop(L, 2);
         error = "invalid control type";
         return false;
       }
+      if(c.type=="slider" && ((c.keys=="brightness" && !capability("power")) || (c.keys=="volume" && !capability("media")) || (!c.keys.empty() && c.keys!="brightness" && c.keys!="volume"))) {lua_pop(L,2);error="slider capability denied";return false;}
       if (c.type == "select") {
         auto count = [](const std::string &s) {
           return 1 + std::count(s.begin(), s.end(), '\n');
@@ -301,6 +333,21 @@ bool Runtime::parseView(lua_State *L) {
   v.menu = field(L, "menu", 32);
   v.switcher = field(L, "switcher", 32);
   v.keyboard = field(L, "keyboard", 32);
+  auto wallpaper=field(L,"wallpaper",100);
+  if(!wallpaper.empty()) {
+    if(wallpaper!=wallpaperName_) {
+      std::string data;
+      if(asset(wallpaper,data,262144) && data.size()>8 && data.substr(0,4)=="T5BG") {
+        auto u16=[&](size_t at) { return unsigned(uint8_t(data[at])) | unsigned(uint8_t(data[at+1]))<<8; };
+        unsigned w=u16(4),h=u16(6);
+        if(w && h && w<=640 && h<=360 && data.size()==8+size_t(w)*h*2) {
+          auto picture=std::make_shared<Picture>();picture->width=w;picture->height=h;
+          picture->pixels=data.substr(8);wallpaper_=picture;wallpaperName_=wallpaper;
+        }
+      }
+    }
+    if(wallpaper==wallpaperName_) v.wallpaper=wallpaper_;
+  }
   v.title = field(L, "title", 384);
   v.body = field(L, "body");
   v.text = field(L, "text", 65536);
@@ -339,7 +386,7 @@ bool Runtime::parseView(lua_State *L) {
   lua_getfield(L, -1, "buttons");
   if (lua_istable(L, -1)) {
     size_t n = lua_rawlen(L, -1);
-    if (n > 32) {
+    if (n > 64) {
       lua_pop(L, 1);
       error = "too many buttons";
       return false;
@@ -353,6 +400,8 @@ bool Runtime::parseView(lua_State *L) {
       }
       Button button{field(L, "id", 512), field(L, "label", 512),
                     field(L, "subtitle", 512), field(L, "icon", 32)};
+      button.close=field(L,"close",96);
+      lua_getfield(L,-1,"outgoing");button.outgoing=lua_toboolean(L,-1);lua_pop(L,1);
       auto path = field(L, "thumbnail", 240);
       if (!path.empty() && capability("media") && permission(path)) {
         if (!thumbnails_.count(path)) {
@@ -387,11 +436,42 @@ bool Runtime::parseView(lua_State *L) {
     }
   }
   lua_pop(L, 1);
+  lua_getfield(L,-1,"sidebar");
+  if(lua_istable(L,-1)){for(size_t i=1;i<=std::min<size_t>(8,lua_rawlen(L,-1));++i){lua_rawgeti(L,-1,i);if(!lua_istable(L,-1)){lua_pop(L,2);error="invalid sidebar";return false;}v.sidebar.push_back({field(L,"id",96),field(L,"label",96),field(L,"subtitle",32),field(L,"icon",32)});lua_pop(L,1);}}
+  lua_pop(L,1);
+  v.optionAction=field(L,"option",64);
+  v.profile=field(L,"profile",32);
+  lua_getfield(L,-1,"centerTools");v.centerTools=lua_toboolean(L,-1);lua_pop(L,1);
+  lua_getfield(L,-1,"columns");if(!lua_isnil(L,-1)) {if(!lua_isinteger(L,-1) || lua_tointeger(L,-1)<1 || lua_tointeger(L,-1)>4) {lua_pop(L,1);error="columns must be 1..4";return false;}v.columns=unsigned(lua_tointeger(L,-1));}lua_pop(L,1);
+  lua_getfield(L,-1,"refreshMs");if(lua_isinteger(L,-1)) v.refreshMs=std::min(5000,std::max(500,int(lua_tointeger(L,-1))));lua_pop(L,1);
+  lua_getfield(L,-1,"footer");
+  if(lua_istable(L,-1)) for(size_t i=1;i<=std::min<size_t>(v.optionAction.empty()?5:4,lua_rawlen(L,-1));++i) {
+    lua_rawgeti(L,-1,i);if(!lua_istable(L,-1)){lua_pop(L,2);error="invalid footer";return false;}v.footer.push_back({field(L,"id",96),field(L,"label",96),"",field(L,"icon",32)});lua_pop(L,1);
+  }
+  lua_pop(L,1);
+  lua_getfield(L,-1,"statusFields");
+  if(lua_istable(L,-1)) for(size_t i=1;i<=std::min<size_t>(8,lua_rawlen(L,-1));++i) {
+    lua_rawgeti(L,-1,i);if(!lua_istable(L,-1)){lua_pop(L,2);error="invalid status field";return false;}StatusField item{field(L,"label",96),field(L,"value",512)};
+    lua_getfield(L,-1,"percent");if(lua_isinteger(L,-1)) item.percent=std::max(0,std::min(100,int(lua_tointeger(L,-1))));lua_pop(L,1);
+    v.statusFields.push_back(std::move(item));lua_pop(L,1);
+  }
+  lua_pop(L,1);
+  if(v.layout=="web_document" && !prepareHtml(L,v))return false;
   view_ = std::move(v);
   return true;
 }
+bool Runtime::readEventMail(const std::string &id, MailMessage &message) {
+  if(eventMail_ && eventMail_->id==id){message=*eventMail_;return true;}
+  if(!mail_.read(id,message))return false;
+  eventMail_=std::make_unique<MailMessage>(message);return true;
+}
 bool Runtime::invoke(VM &v, const std::string &event, const std::string &value,
                      bool render) {
+ try {
+  HtmlAllocationScope allocation;
+  // One snapshot per UI event: Lua and native HTML must not reread/rewrite
+  // a large cached message several times. Never reuse across actions.
+  eventMail_.reset();
   v.budget = 100000;
   moduleDepth_ = 0;
   lua_State *L = v.L;
@@ -413,18 +493,38 @@ bool Runtime::invoke(VM &v, const std::string &event, const std::string &value,
   lua_sethook(L, nullptr, 0, 0);
   moduleDepth_ = 0;
   if (rc != LUA_OK) {
+    // Cancelling a slow native operation is a UI outcome, not a broken app.
+    if(cancelled_ && lua_isstring(L,-1) && std::string(lua_tostring(L,-1))=="cancelled"){
+      v.faulted=false;if(render)view_=v.last;
+      error="Operação cancelada";eventMail_.reset();lua_settop(L,0);return false;
+    }
     v.faulted = true;
     error = lua_tostring(L, -1) ? lua_tostring(L, -1) : "Lua failure";
+    // Persist a bounded classification, never the raw Lua error/arguments:
+    // a script error could otherwise expose a message or a key in the log.
+    std::string location;auto marker=error.find("]:");if(marker!=std::string::npos){auto at=marker+2;while(at<error.size()&&error[at]>='0'&&error[at]<='9'&&location.size()<8)location+=error[at++];}
+    std::string category;for(const char *known:{"scheduler limit","notification limit","invalid network arguments","instruction budget exhausted","not enough memory"})if(error.find(known)!=std::string::npos)category=known;
+    const char *kind=error.find("instruction budget exhausted")!=std::string::npos
+        ? "instruction-budget" : rc==LUA_ERRMEM ? "lua-memory" : "lua-error";
+#ifdef ESP_PLATFORM
+    ESP_LOGE("lua", "runtime=1.0.0 app=%s kind=%s code=%d lua_bytes=%u", v.id.c_str(), kind, rc, unsigned(luaBytes_));
+#endif
+    store_.write("/logs/lua-fault.txt",std::string("runtime=1.0.0\napp=")+v.id+
+        "\nline="+location+"\ncategory="+category+"\nkind="+kind+"\ncode="+std::to_string(rc)+
+        "\nlua_bytes="+std::to_string(luaBytes_)+"\n");
     lua_settop(L, 0);
+    eventMail_.reset();
     return false;
   }
   v.faulted = false;
   bool ok = !render || parseView(L);
+  eventMail_.reset();
   v.faulted = !ok;
   if (ok && render)
     v.last = view_;
   lua_settop(L, 0);
   return ok;
+ }catch(const std::bad_alloc&){v.faulted=true;eventMail_.reset();lua_settop(v.L,0);error="Memória insuficiente para o aplicativo";return false;}
 }
 bool Runtime::load(const std::string &id) {
   moduleDepth_ = 0;
@@ -473,6 +573,10 @@ bool Runtime::load(const std::string &id) {
   for (auto pair : {std::make_pair("asset", resourceApi),
                     std::make_pair("media", mediaApi),
                     std::make_pair("power", powerApi),
+                    std::make_pair("security", securityApi),
+                    std::make_pair("memory", memoryApi),
+                    std::make_pair("radio", radioApi),
+                    std::make_pair("html", htmlApi),
                     std::make_pair("net", networkApi),
                     std::make_pair("package", packageApi),
                     std::make_pair("catalog", catalogApi),
@@ -480,6 +584,7 @@ bool Runtime::load(const std::string &id) {
                     std::make_pair("app_info", appInfoApi),
                     std::make_pair("apps", appsApi),
                     std::make_pair("module", moduleApi),
+                    std::make_pair("mail", mailApi),
                     std::make_pair("read", readApi),
                     std::make_pair("write", writeApi),
                     std::make_pair("time", timeApi),
@@ -547,7 +652,10 @@ bool Runtime::close(const std::string &id) {
     return false;
   }
   if (apps_[id]->faulted) {
-    if (apps_[id]->last.field && !apps_[id]->last.text.empty()) {
+    const auto &last = apps_[id]->last;
+    const bool secret = std::any_of(last.controls.begin(), last.controls.end(),
+        [](const FormControl &c) { return c.type == "password" || c.type == "pin"; });
+    if (last.field && !last.text.empty() && !secret) {
       auto path = "/data/" + id + "/recovered-draft.txt";
       error =
           store_.write(path, apps_[id]->last.text)
@@ -563,6 +671,9 @@ bool Runtime::close(const std::string &id) {
   return true;
 }
 bool Runtime::open(const std::string &id) {
+  if(lock.locked() && id!="lock") { error="Tela bloqueada"; return false; }
+  if(id=="lock" && current_!="lock" && !current_.empty()) resumeApp_=current_;
+
   if (!entries_.count(id) || id == "services") {
     error = "unknown application";
     return false;
@@ -601,10 +712,13 @@ bool Runtime::open(const std::string &id) {
         return false;
     }
   }
+  if(id!=current_){html_.reset();htmlLast_={};}
   auto previous = current_;
   auto oldView = view_;
   bool created = !apps_.count(id);
   current_ = id;
+  Installer sisInstaller(store_);
+  if(installed_.count(id)&&installed_[id].uid&&!sisInstaller.beginSisTrial(id)){current_=previous;view_=oldView;error=sisInstaller.error;return false;}
   if ((created && !load(id)) || !invoke(*apps_[id], "focus", "")) {
     current_ = previous;
     view_ = oldView;
@@ -612,8 +726,10 @@ bool Runtime::open(const std::string &id) {
       apps_.erase(id);
       pictures_.erase(id);
     }
+    if(installed_.count(id)&&installed_[id].uid){auto cause=error;if(!sisInstaller.finishSisTrial(id,false))cause+="; recuperação: "+sisInstaller.error;refreshInstalled();error=cause;}
     return false;
   }
+  if(installed_.count(id)&&installed_[id].uid&&!sisInstaller.finishSisTrial(id,true)){apps_.erase(id);pictures_.erase(id);current_=previous;view_=oldView;error=sisInstaller.error;return false;}
   apps_[id]->touched = ++serial_;
   return true;
 }
@@ -646,6 +762,14 @@ void Runtime::setClock(int64_t epoch) {
   std::lock_guard<std::mutex> lock(clockMutex_);
   clockBase_ = epoch;
   clockStart_ = std::chrono::steady_clock::now();
+#ifdef ESP_PLATFORM
+  // TLS and libc use time(), while the UI keeps an independent steady clock.
+  // Keep both in UTC; never change the development host's clock.
+  if (epoch >= 946684800 && epoch <= 4102444799LL) {
+    timeval systemTime{static_cast<time_t>(epoch), 0};
+    settimeofday(&systemTime, nullptr);
+  }
+#endif
 }
 bool Runtime::tick() {
   if (!ready_)
@@ -660,6 +784,8 @@ bool Runtime::tick() {
     if (apps_.count(m.target) && apps_[m.target]->generation == m.serial)
       ok = background(m.target, m.event, m.value) && ok;
   }
+  std::string profile;store_.read("/config/public/profile",profile);
+  mail_.poll(uint64_t(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()),profile!="offline" && network_.status().connected && now()>=1700000000);
   return ok;
 }
 bool Runtime::dispatch(const std::string &e, const std::string &value) {
@@ -701,7 +827,15 @@ bool Runtime::asset(const std::string &name, std::string &out, size_t maximum) {
   }
   return true;
 }
+bool Runtime::checkpointApps() {
+  for(auto &entry:apps_) {
+    if(entry.first!=current_ && !entry.second->faulted &&
+       !background(entry.first,"checkpoint",entry.second->last.text)) return false;
+  }
+  return true;
+}
 bool Runtime::boot() {
+  lock.bootReset();
   shutdown();
   error.clear();
   if (!store_.mount()) {
@@ -712,16 +846,38 @@ bool Runtime::boot() {
     error = "installation exceeds 4 GB: maintenance required";
     return false;
   }
+  std::string timeout;
+  if(store_.read("/config/public/screen_minutes", timeout, 3) &&
+     (timeout=="0" || timeout=="1" || timeout=="2" || timeout=="5" || timeout=="10" || timeout=="30"))
+    screenMinutes = unsigned(atoi(timeout.c_str()));
+  Releases releases(store_);
   std::string manifest;
-  if (!store_.read("/boot/manifest.txt", manifest, 32768)) {
-    error = "boot manifest missing: " + store_.lastError();
-    return false;
+  if(!releases.select(manifest,error)) return false;
+  // bootManifest validates the shell before the persisted lock is restored.
+
+  if(!bootManifest(manifest)) {
+    const auto original = error;
+    std::string good;
+    if(!store_.read("/boot/confirmed.txt",good,32768) || good==manifest) return false;
+    shutdown(); error.clear();
+    if(!store_.write("/boot/manifest.txt",good) || !bootManifest(good)) return false;
+    manifest=good;
+    store_.write("/logs/recovery.txt","Release rejeitada: "+original+"\nRelease confirmada restaurada.\n");
   }
-  std::istringstream in(manifest);
+  lock.load();
+  if(lock.enabled() && (!entries_.count("lock") || !open("lock"))) {error="PIN configurado: tela de bloqueio indisponível";shutdown();return false;}
+  std::string brightnessText;
+  if(store_.read("/config/public/brightness",brightnessText,3))
+    brightness=std::max(10,std::min(100,atoi(brightnessText.c_str())));
+  if(!releases.confirm(manifest)) { error="Falha ao confirmar release no SD"; shutdown(); return false; }
+  return true;
+}
+bool Runtime::bootManifest(const std::string &manifest) {
+  TextLines in(manifest);
   std::string line;
   std::map<std::string, std::string> values;
   std::vector<std::pair<std::string, std::string>> hashes;
-  while (std::getline(in, line)) {
+  while (nextLine(in, line)) {
     if (line.empty() || line[0] == '#')
       continue;
     auto eq = line.find('=');
@@ -745,16 +901,9 @@ bool Runtime::boot() {
       values[key] = val;
     }
   }
-  if (values["format"] != "1" ||
-      (values["api_min"] != "1" && values["api_min"] != "2" &&
-       values["api_min"] != "3" && values["api_min"] != "4" &&
-       values["api_min"] != "5" && values["api_min"] != "6" &&
-       values["api_min"] != "7" && values["api_min"] != "8") ||
-      (values["api_max"] != "1" && values["api_max"] != "2" &&
-       values["api_max"] != "3" && values["api_max"] != "4" &&
-       values["api_max"] != "5" && values["api_max"] != "6" &&
-       values["api_max"] != "7" && values["api_max"] != "8") ||
-      values["api_min"] > values["api_max"] || values["schema"] != "1") {
+  auto api=[](const std::string &s) { return s=="14" ? 14 : s=="13" ? 13 : s=="12" ? 12 : s=="11" ? 11 : s=="10" ? 10 : s.size()==1 && s[0]>='1' && s[0]<='9' ? s[0]-'0' : 0; };
+  if(values["format"]!="1" || !api(values["api_min"]) || !api(values["api_max"]) ||
+     api(values["api_min"])>api(values["api_max"]) || values["schema"]!="1") {
     error = "incompatible release";
     return false;
   }
@@ -771,12 +920,13 @@ bool Runtime::boot() {
   for (auto &f : hashes) {
     std::string data, p = release_ + "/" + f.first;
     if (verified.count(f.first) || !Storage::validPath(p) ||
-        !store_.read(p, data) || sha256(data) != f.second) {
+        !store_.read(p, data, f.first=="icons.bin"?3145728:1048576) || sha256(data) != f.second) {
       error = "release integrity failed: " + f.first;
       return false;
     }
     verified[f.first] = true;
     verified_[f.first] = f.second;
+    if(bootProgress)bootProgress(unsigned(verified.size()*100/hashes.size()));
   }
   for (auto &v : values)
     if (v.first.rfind("cap.", 0) == 0)
@@ -784,9 +934,9 @@ bool Runtime::boot() {
   for (auto &v : values)
     if (v.first.rfind("grant.", 0) == 0) {
       std::string id = v.first.substr(6);
-      std::istringstream prefixes(v.second);
+      TextLines prefixes(v.second);
       std::string prefix;
-      while (std::getline(prefixes, prefix, ',')) {
+      while (nextLine(prefixes, prefix, ',')) {
         if (prefix != "/" && !Storage::validPath(prefix + "x")) {
           error = "invalid permission grant";
           return false;
@@ -839,6 +989,7 @@ bool Runtime::boot() {
       return false;
     }
   media_.recover();
+  {Installer installer(store_);if(!installer.recoverSisBoot()){error=installer.error;return false;}}
   if (!refreshInstalled())
     return false;
   if (entries_.count("services")) {
@@ -850,7 +1001,7 @@ bool Runtime::boot() {
     current_.clear();
   }
   ready_ = open("shell");
-  timersEnabled_ = ready_;
+  timersEnabled_ = ready_.load();
   return ready_;
 }
 } // namespace tab5

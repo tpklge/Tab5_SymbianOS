@@ -161,7 +161,7 @@ bool Storage::scan(const std::string &rel, std::vector<File> &files,
         ok = false;
         break;
       }
-      files.push_back({p, static_cast<uint64_t>(st.st_size)});
+      files.push_back({p, storageStatBytes(st.st_size)});
       if (files.size() > 10000) {
         ok = false;
         error = "too many files";
@@ -219,6 +219,7 @@ bool Storage::recover() {
 }
 bool Storage::mount() {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
+  ++generation_;
   struct stat st{};
   online_ = pathInfo(root_.c_str(), &st) == 0 && S_ISDIR(st.st_mode) &&
             !S_ISLNK(st.st_mode);
@@ -238,6 +239,7 @@ bool Storage::mount() {
 void Storage::invalidate() {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
   online_ = false;
+  ++generation_;
   error = "card removed or I/O failure";
 }
 bool Storage::list(std::vector<File> &f) {
@@ -253,9 +255,10 @@ bool Storage::read(const std::string &p, std::string &data, size_t max) {
     return false;
   FILE *f = fopen(path.c_str(), "rb");
   if (!f) {
-    error = errno == ENOENT ? "not found" : strerror(errno);
-    if (errno != ENOENT)
-      invalidate();
+    const int code=errno;
+    error = code == ENOENT ? "not found" : strerror(code);
+    // Descriptor/memory pressure is not proof that the SD disappeared.
+    if (code==EIO || code==ENODEV || code==ENXIO)invalidate();
     return false;
   }
   char buf[4096];
@@ -279,8 +282,14 @@ bool Storage::write(const std::string &p, const std::string &data,
                     const std::atomic<bool> *cancel) {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
   std::string path;
-  if (!resolve(p, path) || !reconcile())
+  if (!resolve(p, path))
     return false;
+  struct stat destination{};
+  if (pathInfo(path.c_str(), &destination) == 0 &&
+      !S_ISREG(destination.st_mode)) {
+    error = "write destination must be a regular file";
+    return false;
+  }
   // Entire transaction is a reservation: no second writer can spend its peak
   // space.
   uint64_t ceiling = limit_ > reserve_ ? limit_ - reserve_ : 0;
@@ -322,6 +331,8 @@ bool Storage::write(const std::string &p, const std::string &data,
     return false;
   }
   bool exists = pathInfo(path.c_str(), &st) == 0;
+  uint64_t previous = exists && storageStatBytes(st.st_size)>0 ? storageStatBytes(st.st_size) : 0;
+  if(previous>used_) {unlink(temp.c_str());error="quota ledger changed: remount required";invalidate();return false;}
   if (exists && rename(path.c_str(), old.c_str())) {
     unlink(temp.c_str());
     invalidate();
@@ -337,8 +348,10 @@ bool Storage::write(const std::string &p, const std::string &data,
     invalidate();
     return false;
   }
-  // FAT has no absolute power-loss guarantees; recovery re-audits the tree.
-  return reconcile();
+  // All mutations use the same mutex; peak was reserved above. Mount/recovery
+  // still performs a full audit. External card edits require remounting.
+  used_ = used_ - std::min(used_,previous) + data.size();
+  return true;
 }
 bool Storage::remove(const std::string &p) {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
@@ -354,6 +367,7 @@ bool Storage::remove(const std::string &p) {
     error = strerror(errno);
     return false;
   }
-  return reconcile();
+  if(!S_ISDIR(entry.st_mode) && storageStatBytes(entry.st_size)>0) used_-=std::min(used_,storageStatBytes(entry.st_size));
+  return true;
 }
 } // namespace tab5
